@@ -4,9 +4,14 @@ A static website that shows students when and where they can get help. The whole
 schedule lives in one Excel workbook — `data/office-hours.xlsx` — which the page reads
 directly in the browser. There is no database, no build step, and no server code.
 
-The default view answers one question with no clicking: **when can I get help?** It shows
-how many people are available in each half-hour of the week and nothing else. Names,
+The default view answers one question with no clicking: **when can I get help?** Each
+half-hour of the week is coloured by *what kind* of help is there — green for faculty or
+GTFs, gold for Learning Assistants, split for both — and carries no text at all. Names,
 rooms, and courses appear when a student clicks a block. Filters are all opt-in.
+
+The banner matches the First-Year Engineering Calendar (the CSU Calendar App) so the two
+sites read as one family: same teal bar, same Poppins, same multicoloured rule. The font
+files in `assets/fonts/` are copied from that project.
 
 ---
 
@@ -118,6 +123,7 @@ After that, every `git push` republishes it.
 |---|---|
 | `index.html` | The page. Also serves the check report at `?check=1`. |
 | `assets/styles.css` | All styling, light and dark. |
+| `assets/fonts/` | Poppins, copied from the First-Year Engineering Calendar so the banner matches. |
 | `assets/xlsx.js` | Reads `.xlsx` files in the browser. No libraries — the browser can already unzip and parse XML. |
 | `assets/data.js` | Turns the workbook into the schedule model, and collects anything wrong with it. |
 | `assets/app.js` | Draws the grid, the filters, and the detail panel. |
@@ -132,6 +138,10 @@ After that, every `git push` republishes it.
   it shows the week ahead.
 - Consecutive hours by the same person merge into one block, so a 4–6 PM shift reads as
   one block rather than two.
+- Block colour follows whatever is *currently filtered*. Filter to Learning Assistants and
+  every block turns gold, because that is all that is left.
+- Blocks carry no visible text, so the colour is also written into each block's hover
+  tooltip and its screen-reader label — colour is never the only way to read the grid.
 - A filter with only one possible value stays hidden — the **Format** filter appears once
   somebody actually has online hours.
 - Filter choices are stored in the URL, so a filtered view can be linked to directly:

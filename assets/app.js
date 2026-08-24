@@ -306,7 +306,21 @@ function blocksFor(day) {
   return blocks;
 }
 
-const densityClass = (n) => (n >= 3 ? "s3" : n === 2 ? "s2" : "s1");
+/**
+ * What kind of help is on offer in a block. Faculty and GTFs read as one group
+ * to a student deciding where to go; the distinction between them is in the
+ * detail panel and the Who filter.
+ */
+function composition(entries) {
+  const hasStaff = entries.some((e) => e.person.role !== "la");
+  const hasLa = entries.some((e) => e.person.role === "la");
+  // `label` is spoken and hovered; `short` has to survive a narrow phone row.
+  if (hasStaff && hasLa) {
+    return { key: "both", label: "Faculty/GTF and Learning Assistants", short: "Faculty/GTF + LA" };
+  }
+  if (hasStaff) return { key: "staff", label: "Faculty or GTF", short: "Faculty or GTF" };
+  return { key: "la", label: "Learning Assistants", short: "Learning Assistant" };
+}
 
 function renderGrid() {
   const wrap = $("grid");
@@ -349,20 +363,20 @@ function renderGrid() {
 
     for (const block of blocksFor(day)) {
       const slots = block.endSlot - block.startSlot + 1;
-      const button = el("button", `block ${densityClass(block.entries.length)}${slots < 2 ? " short" : ""}`);
+      const who = composition(block.entries);
+      const button = el("button", `block ${who.key}${slots < 2 ? " short" : ""}`);
       button.type = "button";
       button.style.top = `${block.startSlot * SLOT_H + 2}px`;
       button.style.height = `${slots * SLOT_H - 4}px`;
 
       const count = block.entries.length;
-      button.append(el("span", "n", String(count)));
-      if (slots >= 2 || count > 1) {
-        button.append(el("span", "who", "available"));
-      }
-      button.setAttribute(
-        "aria-label",
-        `${day.name} ${formatRange(block.start, block.end)}: ${count} ${count === 1 ? "person" : "people"} available. Open details.`
-      );
+      const description =
+        `${day.name} ${formatRange(block.start, block.end)}: ${who.label} available ` +
+        `(${count} ${count === 1 ? "person" : "people"}).`;
+      // The block itself carries no text, so the label has to say what the
+      // colour says — for screen readers and for anyone hovering.
+      button.setAttribute("aria-label", `${description} Open details.`);
+      button.title = description;
       button.addEventListener("click", () => openPanel(day, block));
       col.append(button);
     }
@@ -416,12 +430,12 @@ function renderDayList() {
     list.append(el("p", "empty", "No office hours on this day with the filters you have chosen."));
   }
   for (const block of blocks) {
-    const row = el("button", "row");
+    const who = composition(block.entries);
+    const row = el("button", `row ${who.key}`);
     row.type = "button";
-    const count = block.entries.length;
     row.append(
       el("span", "when", formatRange(block.start, block.end)),
-      el("span", "what", `${count} ${count === 1 ? "person" : "people"} available`)
+      el("span", "what", who.short)
     );
     row.addEventListener("click", () => openPanel(day, block));
     list.append(row);
@@ -429,19 +443,14 @@ function renderDayList() {
   host.append(list);
 }
 
+/**
+ * Nothing is reported when there is something to show — the grid speaks for
+ * itself. This exists only so an empty result is never a silent one.
+ */
 function renderSummary() {
-  const shown = new Set();
-  let hours = 0;
-  for (const day of week) {
-    for (const block of blocksFor(day)) {
-      hours += ((block.end - block.start) / 60) * block.entries.length;
-      for (const entry of block.entries) shown.add(entry.person.key);
-    }
-  }
-  const filtered = Object.values(filters).some((set) => set.size);
-  $("summary").textContent = shown.size
-    ? `${shown.size} ${shown.size === 1 ? "person" : "people"} · ${Math.round(hours)} hours of help this week${filtered ? " matching your filters" : ""}.`
-    : "Nothing matches those filters. Try clearing one.";
+  const anything = week.some((day) => blocksFor(day).length);
+  $("summary").textContent = anything ? "" : "Nothing matches those filters. Try clearing one.";
+  $("summary").hidden = anything;
 }
 
 function renderNow() {

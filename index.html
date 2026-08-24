@@ -11,14 +11,15 @@
 <body>
 <a class="skip" href="#grid">Skip to the schedule</a>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand">
-      <h1>Office Hours</h1>
-      <p class="term" id="term"></p>
+<header class="csu-header">
+  <div class="csu-header__bar">
+    <div class="csu-header__brand">
+      <h1 class="csu-header__title">ENGR 111/114/123 Office Hours</h1>
+      <p class="csu-header__range" id="term"></p>
     </div>
-    <div class="updated" id="updated"></div>
+    <div class="csu-header__updated" id="updated"></div>
   </div>
+  <div class="csu-rule"></div>
 </header>
 
 <p class="announcement" id="announcement" hidden></p>
@@ -40,9 +41,9 @@
   </section>
 
   <p class="legend" id="legend" hidden>
-    <span class="key"><i class="swatch s1"></i>1 person</span>
-    <span class="key"><i class="swatch s2"></i>2 people</span>
-    <span class="key"><i class="swatch s3"></i>3 or more</span>
+    <span class="key"><i class="swatch staff"></i>Faculty or GTF</span>
+    <span class="key"><i class="swatch la"></i>Learning Assistant</span>
+    <span class="key"><i class="swatch both"></i>Both</span>
     <span class="key">Click any block to see who is there.</span>
   </p>
 </main>
