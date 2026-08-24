@@ -210,6 +210,16 @@ def main():
     print(f"wrote {NOTES.relative_to(ROOT)}  ({len(flags)} items to review)")
 
 
+def dropdown(formula, message):
+    """A list validation that blocks bad typing but still allows an empty cell —
+    most rows on these sheets are legitimately blank until someone fills them in."""
+    dv = DataValidation(type="list", formula1=formula, allowBlank=True)
+    dv.showErrorMessage = True
+    dv.errorTitle = "Not one of the choices"
+    dv.error = message
+    return dv
+
+
 HEAD_FILL = PatternFill("solid", fgColor="1F3864")
 HEAD_FONT = Font(color="FFFFFF", bold=True)
 
@@ -247,10 +257,9 @@ def write_workbook(people_items, shifts):
                 "migration",
             )
 
-    dv_role = DataValidation(type="list", formula1='"faculty,gtf,la"', allow_blank=False)
-    dv_role.error = "Role must be faculty, gtf, or la."
+    dv_role = dropdown('"faculty,gtf,la"', "Role must be faculty, gtf, or la.")
     ws.add_data_validation(dv_role)
-    dv_role.add(f"C2:C400")
+    dv_role.add("C2:C400")
 
     # -- shifts ---------------------------------------------------------
     sh = wb.create_sheet("shifts")
@@ -271,11 +280,10 @@ def write_workbook(people_items, shifts):
     for col in ("C", "D"):
         sh.column_dimensions[col].number_format = "@"
 
-    dv_day = DataValidation(type="list", formula1='"Monday,Tuesday,Wednesday,Thursday,Friday"')
-    dv_mode = DataValidation(type="list", formula1='"in-person,online"')
-    dv_active = DataValidation(type="list", formula1='"yes,no"')
-    dv_name = DataValidation(type="list", formula1="PeopleNames")
-    dv_name.error = "Pick a name from the people sheet. Add them there first if they are new."
+    dv_day = dropdown('"Monday,Tuesday,Wednesday,Thursday,Friday"', "Office hours are Monday to Friday.")
+    dv_mode = dropdown('"in-person,online"', "Use in-person or online. Blank means in-person.")
+    dv_active = dropdown('"yes,no"', "Use yes or no. Blank means yes.")
+    dv_name = dropdown("PeopleNames", "Pick a name from the people sheet. Add them there first if they are new.")
     for dv, rng in ((dv_day, "B2:B400"), (dv_mode, "E2:E400"), (dv_active, "H2:H400"), (dv_name, "A2:A400")):
         sh.add_data_validation(dv)
         dv.add(rng)
@@ -288,8 +296,8 @@ def write_workbook(people_items, shifts):
         [26, 14, 11, 11, 12, 12, 20, 46],
     )
     ex["A2"] = ""
-    dv_type = DataValidation(type="list", formula1='"cancelled,added"')
-    dv_ex_name = DataValidation(type="list", formula1="PeopleNames")
+    dv_type = dropdown('"cancelled,added"', "Use cancelled or added.")
+    dv_ex_name = dropdown("PeopleNames", "Pick a name from the people sheet.")
     for dv, rng in ((dv_type, "E2:E400"), (dv_ex_name, "A2:A400")):
         ex.add_data_validation(dv)
         dv.add(rng)
