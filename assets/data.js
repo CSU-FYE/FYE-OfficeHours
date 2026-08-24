@@ -1,0 +1,391 @@
+/*
+ * Turns the workbook into the model the page renders from.
+ *
+ * Everything forgiving happens here: the spreadsheet is edited by a dozen people,
+ * so times, days, roles and course codes are all normalized rather than trusted.
+ * Anything that cannot be normalized is recorded as a problem instead of throwing,
+ * so one bad row never blanks the page. Problems are shown on ?check=1.
+ */
+
+import { readWorkbook, toRecords } from "./xlsx.js";
+
+export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+export const ROLE_LABELS = { faculty: "Faculty", gtf: "GTF", la: "Learning Assistant" };
+export const SLOT_MINUTES = 30;
+
+const DEFAULTS = {
+  day_start: "9:00 AM",
+  day_end: "9:00 PM",
+  default_courses: "ENGR 111; ENGR 114",
+  default_location_faculty: "AV C147",
+  default_location_gtf: "AV C147",
+  default_location_la: "AV C144",
+  term_name: "",
+  announcement: "",
+};
+
+/* ------------------------------------------------------------ normalizing */
+
+const str = (v) => (v === null || v === undefined ? "" : String(v).trim());
+
+/** Match names loosely so "Dr. Harvey" and "Dr Harvey" are the same person. */
+export const nameKey = (v) =>
+  str(v)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const ROLE_ALIASES = {
+  faculty: "faculty", professor: "faculty", prof: "faculty", instructor: "faculty",
+  gtf: "gtf", gta: "gtf", ta: "gtf", "graduate ta": "gtf", "grad ta": "gtf",
+  la: "la", "learning assistant": "la",
+};
+
+export function normalizeRole(v) {
+  return ROLE_ALIASES[str(v).toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ")] || null;
+}
+
+const TIME_RE = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$/i;
+
+/**
+ * "1:30 PM" | "13:30" | 0.5625 (an Excel time cell) -> minutes since midnight.
+ * Returns null if it cannot be read.
+ */
+export function parseTime(value) {
+  if (value === "" || value === null || value === undefined) return null;
+
+  // Excel stores a time as a fraction of a day once the cell is formatted as time.
+  if (typeof value === "number") {
+    if (value < 0 || value >= 1) return null;
+    return Math.round(value * 24 * 60);
+  }
+
+  const m = TIME_RE.exec(str(value).replace(/\./g, "").replace(/\s+/g, " ").trim());
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2] || 0);
+  const mer = (m[3] || "").toLowerCase()[0];
+  if (minute > 59) return null;
+  if (mer === "p" && hour !== 12) hour += 12;
+  if (mer === "a" && hour === 12) hour = 0;
+  if (hour > 24) return null;
+  return hour * 60 + minute;
+}
+
+export function formatTime(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const mer = h < 12 || h === 24 ? "AM" : "PM";
+  const h12 = h % 12 || 12;
+  return m ? `${h12}:${String(m).padStart(2, "0")} ${mer}` : `${h12} ${mer}`;
+}
+
+export function formatRange(start, end) {
+  return `${formatTime(start)}–${formatTime(end)}`;
+}
+
+/** "2026-09-01" | "9/1/2026" | 46266 (an Excel date cell) -> "2026-09-01". */
+export function parseDate(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    if (value < 20000) return null;
+    // Excel's epoch is 1899-12-30 (its 1900 leap-year bug is baked into the offset).
+    const ms = Math.round(value) * 86400000 + Date.UTC(1899, 11, 30);
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+  const s = str(value);
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(s);
+  if (m) {
+    const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${year}-${pad(m[1])}-${pad(m[2])}`;
+  }
+  return null;
+}
+
+const pad = (n) => String(n).padStart(2, "0");
+
+export const dateKey = (d) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+/** "engr111; ENGR 114" -> ["ENGR 111", "ENGR 114"] */
+export function parseCourses(value) {
+  return str(value)
+    .split(/[;,]/)
+    .map((c) => c.trim().replace(/^([A-Za-z]+)\s*(\d.*)$/, (_, a, b) => `${a.toUpperCase()} ${b}`))
+    .filter(Boolean);
+}
+
+function normalizeDay(value) {
+  const s = str(value).toLowerCase();
+  return DAYS.find((d) => d.toLowerCase().startsWith(s.slice(0, 3))) || null;
+}
+
+/* ----------------------------------------------------------------- build  */
+
+export async function loadModel(buffer) {
+  const sheets = await readWorkbook(buffer);
+  const find = (name) => {
+    const key = Object.keys(sheets).find((k) => k.trim().toLowerCase() === name);
+    return key ? toRecords(sheets[key]) : [];
+  };
+  return buildModel({
+    people: find("people"),
+    shifts: find("shifts"),
+    exceptions: find("exceptions"),
+    settings: find("settings"),
+    sheetNames: Object.keys(sheets),
+  });
+}
+
+export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: exceptionRows, settings: settingRows, sheetNames = [] }) {
+  const problems = [];
+  const problem = (level, sheet, row, message) => problems.push({ level, sheet, row, message });
+
+  /* settings */
+  const settings = { ...DEFAULTS };
+  for (const r of settingRows) {
+    const key = str(r.key).toLowerCase();
+    if (key) settings[key] = str(r.value);
+  }
+  for (const [k, v] of Object.entries(DEFAULTS)) {
+    if (!str(settings[k])) settings[k] = v;
+  }
+
+  const dayStart = parseTime(settings.day_start) ?? 9 * 60;
+  const dayEnd = parseTime(settings.day_end) ?? 21 * 60;
+  const defaultCourses = parseCourses(settings.default_courses);
+  const defaultLocation = (role) => str(settings[`default_location_${role}`]);
+
+  if (!peopleRows.length) {
+    problem("error", "people", null,
+      sheetNames.length
+        ? `No rows found. The workbook has these sheets: ${sheetNames.join(", ")}.`
+        : "No rows found.");
+  }
+
+  /* people */
+  const people = new Map();
+  for (const r of peopleRows) {
+    const name = str(r.name);
+    if (!name) continue;
+    const key = nameKey(name);
+    if (people.has(key)) {
+      problem("error", "people", r.__row, `"${name}" is listed twice. Names must be unique.`);
+      continue;
+    }
+    const role = normalizeRole(r.role);
+    if (!role) {
+      problem("error", "people", r.__row,
+        `"${name}" has role "${str(r.role) || "(blank)"}". Use faculty, gtf, or la. This person and their shifts are hidden.`);
+      continue;
+    }
+    const courses = parseCourses(r.courses);
+    people.set(key, {
+      key,
+      name,
+      displayName: str(r.display_name) || name,
+      role,
+      courses: courses.length ? courses : defaultCourses,
+      usesDefaultCourses: !courses.length,
+      email: str(r.email),
+      notes: str(r.notes),
+      shifts: [],
+    });
+  }
+
+  /* shifts */
+  const shifts = [];
+  for (const r of shiftRows) {
+    const rawName = str(r.name);
+    if (!rawName) continue;
+    if (/^no$/i.test(str(r.active))) continue;
+
+    const person = people.get(nameKey(rawName));
+    if (!person) {
+      problem("error", "shifts", r.__row,
+        `"${rawName}" is not on the people sheet (or their row there is invalid). This shift is hidden.`);
+      continue;
+    }
+    const day = normalizeDay(r.day);
+    if (!day) {
+      problem("error", "shifts", r.__row,
+        `${rawName}: "${str(r.day) || "(blank)"}" is not a weekday. This shift is hidden.`);
+      continue;
+    }
+    const start = parseTime(r.start);
+    const end = parseTime(r.end);
+    if (start === null || end === null) {
+      problem("error", "shifts", r.__row,
+        `${rawName} ${day}: could not read the time "${str(r.start)}" to "${str(r.end)}". Try 9:00 AM. This shift is hidden.`);
+      continue;
+    }
+    if (end <= start) {
+      problem("error", "shifts", r.__row,
+        `${rawName} ${day}: ends (${formatTime(end)}) at or before it starts (${formatTime(start)}). This shift is hidden.`);
+      continue;
+    }
+    if (start % SLOT_MINUTES || end % SLOT_MINUTES) {
+      problem("warning", "shifts", r.__row,
+        `${rawName} ${day} ${formatRange(start, end)}: times should land on the hour or half hour. Shown rounded.`);
+    }
+    if (start < dayStart || end > dayEnd) {
+      problem("warning", "shifts", r.__row,
+        `${rawName} ${day} ${formatRange(start, end)} falls partly outside the ${formatTime(dayStart)}–${formatTime(dayEnd)} grid and is clipped.`);
+    }
+
+    const mode = /^online$/i.test(str(r.mode)) ? "online" : "in-person";
+    if (str(r.mode) && !/^(online|in-person|in person|inperson)$/i.test(str(r.mode))) {
+      problem("warning", "shifts", r.__row,
+        `${rawName} ${day}: mode "${str(r.mode)}" is not recognized, treated as in-person.`);
+    }
+    const courses = parseCourses(r.courses);
+
+    shifts.push({
+      id: `s${shifts.length}`,
+      person,
+      day,
+      dayIndex: DAYS.indexOf(day),
+      start: round(Math.max(start, dayStart)),
+      end: round(Math.min(end, dayEnd)),
+      mode,
+      location: str(r.location) || defaultLocation(person.role),
+      courses: courses.length ? courses : person.courses,
+      notes: str(r.notes),
+      row: r.__row,
+    });
+  }
+
+  for (const shift of shifts) shift.person.shifts.push(shift);
+
+  /* overlapping duplicates for one person on one day */
+  const seen = new Map();
+  for (const s of shifts) {
+    const key = `${s.person.key}|${s.dayIndex}`;
+    for (const other of seen.get(key) || []) {
+      if (s.start < other.end && other.start < s.end) {
+        problem("warning", "shifts", s.row,
+          `${s.person.name} is listed twice on ${s.day} over the same time (rows ${other.row} and ${s.row}). They will be counted once.`);
+      }
+    }
+    seen.set(key, [...(seen.get(key) || []), s]);
+  }
+
+  /* exceptions */
+  const exceptions = [];
+  for (const r of exceptionRows) {
+    const rawName = str(r.name);
+    if (!rawName) continue;
+    const person = people.get(nameKey(rawName));
+    if (!person) {
+      problem("error", "exceptions", r.__row, `"${rawName}" is not on the people sheet. This row is ignored.`);
+      continue;
+    }
+    const date = parseDate(r.date);
+    if (!date) {
+      problem("error", "exceptions", r.__row,
+        `${rawName}: could not read the date "${str(r.date)}". Try 2026-09-15. This row is ignored.`);
+      continue;
+    }
+    const type = /^add(ed)?$/i.test(str(r.type)) ? "added" : "cancelled";
+    if (str(r.type) && !/^(cancelled|canceled|cancel|added|add)$/i.test(str(r.type))) {
+      problem("warning", "exceptions", r.__row,
+        `${rawName} ${date}: type "${str(r.type)}" is not recognized, treated as cancelled.`);
+    }
+    const start = parseTime(r.start);
+    const end = parseTime(r.end);
+    if (type === "added" && (start === null || end === null)) {
+      problem("error", "exceptions", r.__row,
+        `${rawName} ${date}: added hours need both a start and an end time. This row is ignored.`);
+      continue;
+    }
+    if (start !== null && end !== null && end <= start) {
+      problem("error", "exceptions", r.__row,
+        `${rawName} ${date}: ends at or before it starts. This row is ignored.`);
+      continue;
+    }
+
+    const dayIndex = DAYS.indexOf(weekdayOf(date));
+    if (type === "added" && dayIndex < 0) {
+      problem("warning", "exceptions", r.__row,
+        `${rawName} ${date} falls on a weekend, which the grid does not show.`);
+    }
+    if (type === "cancelled") {
+      const matches = person.shifts.filter(
+        (s) => s.dayIndex === dayIndex && (start === null || (s.start < end && start < s.end))
+      );
+      if (!matches.length) {
+        problem("warning", "exceptions", r.__row,
+          `${rawName} has no office hours on ${date}${start === null ? "" : ` at ${formatRange(start, end)}`}, so this cancellation changes nothing.`);
+      }
+    }
+
+    exceptions.push({
+      person, date, type, dayIndex,
+      start: start === null ? null : round(start),
+      end: end === null ? null : round(end),
+      mode: /^online$/i.test(str(r.mode)) ? "online" : "in-person",
+      location: str(r.location) || defaultLocation(person.role),
+      note: str(r.note) || str(r.notes),
+      row: r.__row,
+    });
+  }
+
+  const courses = [...new Set([...defaultCourses, ...shifts.flatMap((s) => s.courses)])].sort();
+  const roles = ["faculty", "gtf", "la"].filter((role) => shifts.some((s) => s.person.role === role));
+
+  return {
+    settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems,
+    slotCount: Math.ceil((dayEnd - dayStart) / SLOT_MINUTES),
+  };
+}
+
+const round = (m) => Math.round(m / SLOT_MINUTES) * SLOT_MINUTES;
+
+function weekdayOf(isoDate) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return ["Sunday", ...DAYS, "Saturday"][new Date(y, m - 1, d).getDay()];
+}
+
+/**
+ * Everyone available on a given date and time, after filters, with exceptions applied.
+ * Returns entries, not people, so one person appearing twice is still one row.
+ */
+export function availabilityAt(model, isoDate, dayIndex, minute, matches) {
+  const out = [];
+  const seen = new Set();
+
+  for (const shift of model.shifts) {
+    if (shift.dayIndex !== dayIndex) continue;
+    if (minute < shift.start || minute >= shift.end) continue;
+    if (matches && !matches(shift)) continue;
+    if (seen.has(shift.person.key)) continue;
+    const cancelled = model.exceptions.find(
+      (e) =>
+        e.type === "cancelled" &&
+        e.person.key === shift.person.key &&
+        e.date === isoDate &&
+        (e.start === null || (minute >= e.start && minute < e.end))
+    );
+    seen.add(shift.person.key);
+    out.push({ shift, person: shift.person, cancelled: cancelled || null });
+  }
+
+  for (const e of model.exceptions) {
+    if (e.type !== "added" || e.date !== isoDate) continue;
+    if (minute < e.start || minute >= e.end) continue;
+    const pseudo = {
+      id: `x${e.row}`, person: e.person, day: DAYS[e.dayIndex], dayIndex: e.dayIndex,
+      start: e.start, end: e.end, mode: e.mode, location: e.location,
+      courses: e.person.courses, notes: e.note, oneOff: true,
+    };
+    if (matches && !matches(pseudo)) continue;
+    if (seen.has(e.person.key)) continue;
+    seen.add(e.person.key);
+    out.push({ shift: pseudo, person: e.person, cancelled: null });
+  }
+
+  return out.filter((entry) => !entry.cancelled);
+}

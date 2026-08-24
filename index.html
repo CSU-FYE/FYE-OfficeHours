@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office Hours</title>
+<meta name="description" content="When and where to get help with your engineering courses.">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🕐</text></svg>">
+</head>
+<body>
+<a class="skip" href="#grid">Skip to the schedule</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <h1>Office Hours</h1>
+      <p class="term" id="term"></p>
+    </div>
+    <div class="updated" id="updated"></div>
+  </div>
+</header>
+
+<p class="announcement" id="announcement" hidden></p>
+
+<main>
+  <section class="now" id="now" aria-live="polite" hidden></section>
+
+  <section class="filters" aria-label="Filter the schedule">
+    <div class="filter-row" id="filter-row"></div>
+    <button type="button" class="clear" id="clear" hidden>Clear filters</button>
+  </section>
+
+  <p class="summary" id="summary"></p>
+
+  <div class="daytabs" id="daytabs" role="tablist" aria-label="Day" hidden></div>
+
+  <section id="grid" class="grid-wrap" tabindex="-1" aria-label="Weekly schedule">
+    <p class="loading" id="loading">Loading the schedule…</p>
+  </section>
+
+  <p class="legend" id="legend" hidden>
+    <span class="key"><i class="swatch s1"></i>1 person</span>
+    <span class="key"><i class="swatch s2"></i>2 people</span>
+    <span class="key"><i class="swatch s3"></i>3 or more</span>
+    <span class="key">Click any block to see who is there.</span>
+  </p>
+</main>
+
+<div class="panel-scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden>
+  <div class="panel-head">
+    <div>
+      <h2 id="panel-title"></h2>
+      <p class="panel-sub" id="panel-sub"></p>
+    </div>
+    <button type="button" class="close" id="panel-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+</aside>
+
+<footer>
+  <p id="footnote"></p>
+</footer>
+
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>
