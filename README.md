@@ -5,9 +5,9 @@ schedule lives in one Excel workbook — `data/office-hours.xlsx` — which the 
 directly in the browser. There is no database, no build step, and no server code.
 
 The default view answers one question with no clicking: **when can I get help?** Each
-half-hour of the week is coloured by *what kind* of help is there — green for faculty or
-GTFs, gold for Learning Assistants, split for both — and carries no text at all. Names,
-rooms, and courses appear when a student clicks a block. Filters are all opt-in.
+half-hour of the week is coloured by **which room** to walk to, and carries no text at
+all. Names, courses, and who is on duty appear when a student clicks an hour. Filters are
+all opt-in.
 
 The banner matches the First-Year Engineering Calendar (the CSU Calendar App) so the two
 sites read as one family: same teal bar, same Poppins, same multicoloured rule. The font
@@ -138,20 +138,26 @@ After that, every `git push` republishes it.
   it shows the week ahead.
 - Consecutive hours by the same person merge into one block, so a 4–6 PM shift reads as
   one block rather than two.
-- Block colour follows whatever is *currently filtered*. Filter to Learning Assistants and
-  every block turns gold, because that is all that is left.
+- **Rooms colour themselves.** Type a new room into a `location` cell and it gets its own
+  colour and a legend entry with no code change. Every other room in the palette also
+  carries a texture — stripes, dots — so two rooms stay distinguishable in greyscale or
+  to a colour-blind reader; hue is never the only difference. `room_order` in `settings`
+  pins which room gets which colour, so "green is C144" stays true as the schedule grows.
+- A half hour split across two rooms shows both colours side by side.
+- Block colour follows whatever is *currently filtered*, and the legend narrows with it.
 - A block is one outlined shape covering an unbroken stretch of availability, with the
-  colour **banded per half hour** inside it. A band boundary means the *mix of roles*
-  actually changed — an afternoon that ends with only an LA on duty goes gold — but one
-  person handing over to another of the same role draws no seam, so individual shift
-  times still are not readable from the grid. The Person filter is what reveals those.
+  colour **banded per half hour** inside it. A band boundary means the room actually
+  changed; one person handing over to another in the same room draws no seam, so
+  individual shift times still are not readable from the grid. The Person filter is what
+  reveals those.
 - Even so, each block is clickable **hour by hour**. Clicking outlines that hour and the
   panel lists only who is there then. On a desktop the panel is a side rail and the grid
   stays live, so you can step along the hours; on a phone it is a sheet.
 - Blocks carry no visible text, so the colour is also written into each block's hover
   tooltip and its screen-reader label — colour is never the only way to read the grid.
-- A filter with only one possible value stays hidden — the **Format** filter appears once
-  somebody actually has online hours.
+- A filter with only one possible value stays hidden. **Format** appears once somebody has
+  online hours; **Where** (AV vs Elsewhere) appears once something is booked outside the
+  AV building. Online counts as Elsewhere.
 - Filter choices are stored in the URL, so a filtered view can be linked to directly:
   `.../#course=ENGR+114&mode=online` links straight to online ENGR 114 help.
 - Rows the site can't read are hidden from students, never shown as errors. `?check=1` is

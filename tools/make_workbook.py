@@ -27,8 +27,14 @@ OUT = ROOT / "data" / "office-hours.xlsx"
 NOTES = ROOT / "MIGRATION-NOTES.md"
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+# Where the old grids said each group met. Used only to spot per-cell overrides:
+# a room matching the group's own default is dropped so the settings sheet stays
+# the single place a room is changed.
 ROOM_FACULTY = "AV C147"
 ROOM_LA = "AV C144"
+# Where everyone meets now. Faculty and GTFs moved out of C147 into C144, so the
+# blanks written above resolve to this.
+ROOM_DEFAULT = "AV C144"
 
 # Roles we could not read off the source with certainty. Every name here is
 # reported in MIGRATION-NOTES.md for review.
@@ -313,9 +319,10 @@ def write_workbook(people_items, shifts):
         ("term_end", "2026-12-11"),
         ("day_start", "9:00 AM"),
         ("day_end", "9:00 PM"),
-        ("default_location_faculty", ROOM_FACULTY),
-        ("default_location_gtf", ROOM_FACULTY),
-        ("default_location_la", ROOM_LA),
+        ("default_location_faculty", ROOM_DEFAULT),
+        ("default_location_gtf", ROOM_DEFAULT),
+        ("default_location_la", ROOM_DEFAULT),
+        ("room_order", "AV C144; AV C141; Scott Engineering"),
         ("default_courses", "ENGR 111; ENGR 114"),
         ("timezone", "America/Denver"),
         ("announcement", ""),
@@ -349,6 +356,8 @@ def write_workbook(people_items, shifts):
         ("  start / end   like 9:00 AM or 1:30 PM. Must land on the hour or half hour.", False),
         ("  mode          in-person or online. Blank = in-person.", False),
         ("  location      blank = the default room for their role (see settings).", False),
+        ("                Fill it in for anywhere else - AV C141, Scott Engineering, etc.", False),
+        ("                The site gives every room its own colour automatically.", False),
         ("                For online, put the meeting link here.", False),
         ("  active        put no to hide a row for a while without deleting it.", False),
         ("", False),

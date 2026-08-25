@@ -32,7 +32,9 @@ let activeDay = 0;
 // Which hour the reader has picked, so the grid can outline it. Kept out of the
 // block geometry on purpose: the block stays one shape, the outline moves.
 let selection = null;
-const filters = { course: new Set(), role: new Set(), mode: new Set(), person: new Set() };
+const filters = {
+  course: new Set(), role: new Set(), mode: new Set(), building: new Set(), person: new Set(),
+};
 
 /* ------------------------------------------------------------------ boot */
 
@@ -65,6 +67,8 @@ async function start(buffer, lastModified) {
     $("announcement").textContent = model.settings.announcement;
     $("announcement").hidden = false;
   }
+
+  roomIndex = new Map(orderedRooms().map((room, i) => [room, i]));
 
   if (new URLSearchParams(location.search).has("check")) return renderReport();
 
@@ -135,6 +139,7 @@ const matches = (shift) =>
   (!filters.course.size || shift.courses.some((c) => filters.course.has(c))) &&
   (!filters.role.size || filters.role.has(shift.person.role)) &&
   (!filters.mode.size || filters.mode.has(shift.mode)) &&
+  (!filters.building.size || filters.building.has(buildingOf(shift))) &&
   (!filters.person.size || filters.person.has(shift.person.key));
 
 // Learning Assistants first: they are the largest group and the one a student
@@ -160,6 +165,13 @@ function filterDefinitions() {
       options: [
         { value: "in-person", label: "In person", show: has((s) => s.mode === "in-person") },
         { value: "online", label: "Online", show: has((s) => s.mode === "online") },
+      ].filter((o) => o.show),
+    },
+    {
+      key: "building", label: "Where",
+      options: [
+        { value: "AV", label: "AV", show: has((s) => buildingOf(s) === "AV") },
+        { value: "Elsewhere", label: "Elsewhere", show: has((s) => buildingOf(s) === "Elsewhere") },
       ].filter((o) => o.show),
     },
     {
@@ -290,7 +302,7 @@ function renderAll() {
   renderGrid();
   renderDayTabs();
   renderDayList();
-  $("legend").hidden = false;
+  renderLegend();
   $("footnote").textContent =
     "This schedule runs every week of the term. Hours can change — check back before you head over.";
 }
@@ -392,10 +404,11 @@ function fillsFor(block) {
   for (let start = block.start; start < block.end; start += SLOT_MINUTES) {
     const entries = entriesBetween(block, start, start + SLOT_MINUTES);
     if (!entries.length) continue;
-    const key = composition(entries).key;
+    const rooms = roomsIn(entries);
+    const key = rooms.join("|");
     const last = fills[fills.length - 1];
     if (last && last.key === key && last.end === start) last.end = start + SLOT_MINUTES;
-    else fills.push({ start, end: start + SLOT_MINUTES, key });
+    else fills.push({ start, end: start + SLOT_MINUTES, key, rooms });
   }
   return fills;
 }
@@ -406,21 +419,52 @@ const isSelected = (day, section) =>
   selection.start === section.start &&
   selection.end === section.end;
 
+/** Where a shift meets. An online shift's "room" is the word Online, never its URL. */
+const roomOf = (shift) => (shift.mode === "online" ? "Online" : shift.location || "Room TBC");
+
+/** AV or not — the distinction behind the Where filter. Online counts as elsewhere. */
+const buildingOf = (shift) => (/^av\b/i.test(roomOf(shift)) ? "AV" : "Elsewhere");
+
 /**
- * What kind of help is on offer in a block. Faculty and GTFs read as one group
- * to a student deciding where to go; the distinction between them is in the
- * detail panel and the Who filter.
+ * Every room in use, in the order their colours are assigned. `room_order` in
+ * the settings sheet pins the ones that matter, so "green is 144" stays true
+ * even as shift counts move around; anything unlisted follows by how often it
+ * is used, then by name.
  */
-function composition(entries) {
-  const hasStaff = entries.some((e) => e.person.role !== "la");
-  const hasLa = entries.some((e) => e.person.role === "la");
-  // `label` is spoken and hovered; `short` has to survive a narrow phone row.
-  if (hasStaff && hasLa) {
-    return { key: "both", label: "Faculty/GTF and Learning Assistants", short: "Faculty/GTF + LA" };
+function orderedRooms() {
+  const counts = new Map();
+  for (const shift of model.shifts) {
+    const room = roomOf(shift);
+    counts.set(room, (counts.get(room) || 0) + 1);
   }
-  if (hasStaff) return { key: "staff", label: "Faculty or GTF", short: "Faculty or GTF" };
-  return { key: "la", label: "Learning Assistants", short: "Learning Assistant" };
+  for (const exception of model.exceptions) {
+    if (exception.type !== "added") continue;
+    const room = exception.mode === "online" ? "Online" : exception.location;
+    counts.set(room, (counts.get(room) || 0) + 1);
+  }
+
+  const pinned = String(model.settings.room_order || "")
+    .split(/[;,]/)
+    .map((r) => r.trim())
+    .filter(Boolean);
+
+  const rest = [...counts.keys()]
+    .filter((room) => !pinned.some((p) => p.toLowerCase() === room.toLowerCase()))
+    .sort((a, b) => counts.get(b) - counts.get(a) || a.localeCompare(b));
+
+  return [...pinned.filter((p) => [...counts.keys()].some((r) => r.toLowerCase() === p.toLowerCase())), ...rest];
 }
+
+let roomIndex = new Map();
+
+/** The distinct rooms in play across a set of entries, in palette order. */
+function roomsIn(entries) {
+  const rooms = [...new Set(entries.map((e) => roomOf(e.shift)))];
+  return rooms.sort((a, b) => (roomIndex.get(a) ?? 99) - (roomIndex.get(b) ?? 99));
+}
+
+const roomsLabel = (rooms) =>
+  rooms.length === 1 ? rooms[0] : `${rooms.slice(0, -1).join(", ")} and ${rooms[rooms.length - 1]}`;
 
 function renderGrid() {
   const wrap = $("grid");
@@ -470,9 +514,11 @@ function renderGrid() {
 
       const offset = (minute) => ((minute - block.start) / SLOT_MINUTES) * SLOT_H;
       for (const fill of fillsFor(block)) {
-        const band = el("div", `fill ${fill.key}`);
+        const band = el("div", "fill");
         band.style.top = `${offset(fill.start)}px`;
         band.style.height = `${offset(fill.end) - offset(fill.start)}px`;
+        // One stripe per room, so a half hour split across two rooms shows both.
+        for (const room of fill.rooms) band.append(el("div", `room r${roomIndex.get(room) ?? 0}`));
         shape.append(band);
       }
 
@@ -486,8 +532,8 @@ function renderGrid() {
         const count = section.entries.length;
         const description =
           `${day.name} ${formatRange(section.start, section.end)}: ` +
-          `${composition(section.entries).label} available ` +
-          `(${count} ${count === 1 ? "person" : "people"}).`;
+          `${roomsLabel(roomsIn(section.entries))} · ` +
+          `${count} ${count === 1 ? "person" : "people"}.`;
         // The grid carries no text, so the label has to say what the colour says.
         button.setAttribute("aria-label", `${description} Open details.`);
         button.title = description;
@@ -549,23 +595,41 @@ function renderDayList() {
     list.append(head);
 
     for (const section of sectionsFor(block)) {
-      const who = composition(section.entries);
-      const row = el("button", `row ${who.key}`);
+      const rooms = roomsIn(section.entries);
+      const row = el("button", "row");
       row.type = "button";
       if (isSelected(day, section)) row.classList.add("selected");
+      const edge = el("span", "edge");
+      for (const room of rooms) edge.append(el("i", `room r${roomIndex.get(room) ?? 0}`));
       row.append(
+        edge,
         el("span", "when", formatRange(section.start, section.end)),
-        el("span", "what", who.short)
+        el("span", "what", roomsLabel(rooms))
       );
       row.setAttribute(
         "aria-label",
-        `${day.name} ${formatRange(section.start, section.end)}: ${composition(section.entries).label} available.`
+        `${day.name} ${formatRange(section.start, section.end)}: ${roomsLabel(rooms)}.`
       );
       row.addEventListener("click", () => selectSection(day, section));
       list.append(row);
     }
   }
   host.append(list);
+}
+
+function renderLegend() {
+  const legend = $("legend");
+  legend.innerHTML = "";
+  const rooms = orderedRooms().filter((room) =>
+    model.shifts.some((s) => roomOf(s) === room && matches(s))
+  );
+  for (const room of rooms) {
+    const key = el("span", "key");
+    key.append(el("i", `swatch room r${roomIndex.get(room) ?? 0}`), document.createTextNode(room));
+    legend.append(key);
+  }
+  legend.append(el("span", "key", "Click any block to see who is there."));
+  legend.hidden = !rooms.length;
 }
 
 /**

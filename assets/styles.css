@@ -31,12 +31,15 @@
   --green-500: #1e7a55;
   --gold: #c8a45c;
 
-  /* Who is available, not how many. Green and gold stay distinguishable for
-     every common form of colour blindness; green and teal would not. */
-  --staff: #1e4d2b;
-  --staff-ink: #ffffff;
-  --la: #ffc038;
-  --la-ink: #3d2c00;
+  /* Rooms, in palette order. Hue alone fails a colour-blind reader, so every
+     other room also carries a texture: the pattern, not the hue, is what tells
+     two rooms apart in greyscale or with deuteranopia. */
+  --room-0: #1e4d2b;
+  --room-1: #ffc038;
+  --room-2: #0088b0;
+  --room-3: #d9782e;
+  --room-4: #5b3f8c;
+  --room-5: #4a5568;
 
   --bg: #f6f5f1;
   --surface: #ffffff;
@@ -73,10 +76,12 @@
     --on-s3: #eafaf2;
     --focus: #6fc9a1;
 
-    --staff: #2f7a4a;
-    --staff-ink: #f2fbf5;
-    --la: #e0a52e;
-    --la-ink: #2b1f00;
+    --room-0: #2f7a4a;
+    --room-1: #e0a52e;
+    --room-2: #2f9fc4;
+    --room-3: #cc7433;
+    --room-4: #7a5cae;
+    --room-5: #5d6b7a;
   }
 }
 
@@ -294,7 +299,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18);
 }
 
-.fill { position: absolute; left: 0; right: 0; }
+.fill { position: absolute; left: 0; right: 0; display: flex; }
+/* One stripe per room in that half hour; two rooms at once split the width. */
+.fill .room { flex: 1; min-width: 0; }
 
 .section {
   position: absolute; left: 0; right: 0; z-index: 1;
@@ -310,13 +317,33 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
     inset 0 0 0 2px rgb(255 255 255 / 0.95),
     inset 0 0 0 4px rgb(0 0 0 / 0.55);
 }
-.fill.staff { background: var(--staff); }
-.fill.la { background: var(--la); }
-/* Both roles present: split down the middle. A diagonal stretched into a long
-   wedge once blocks started spanning whole afternoons; a vertical split reads
-   the same at any height, and keeps the green column continuous down a run of
-   bands that all have faculty in them. */
-.fill.both { background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%); }
+.room.r0 { background: var(--room-0); }
+.room.r1 { background: var(--room-1); }
+.room.r2 { background: var(--room-2); }
+.room.r3 { background: var(--room-3); }
+.room.r4 { background: var(--room-4); }
+.room.r5 { background: var(--room-5); }
+
+/* Textures on the odd-numbered rooms. Sized in absolute units so a stripe
+   looks the same in a tall block and in a 12px legend chip. */
+.room.r1 {
+  background-image: repeating-linear-gradient(
+    45deg, rgb(0 0 0 / 0.34) 0 4px, transparent 4px 9px);
+}
+.room.r3 {
+  background-image:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 3px, transparent 3px 8px),
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.4) 0 3px, transparent 3px 8px);
+}
+.room.r5 {
+  background-image: repeating-linear-gradient(
+    -45deg, rgb(255 255 255 / 0.32) 0 4px, transparent 4px 9px);
+}
+.room.r2 {
+  background-image: radial-gradient(rgb(255 255 255 / 0.55) 1.6px, transparent 1.7px);
+  background-size: 9px 9px;
+}
+
 
 .nowline { position: absolute; left: 0; right: 0; height: 2px; background: #c0392b; z-index: 5; pointer-events: none; }
 .nowline::before {
@@ -326,10 +353,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; color: var(--ink-2); font-size: 0.84rem; }
 .key { display: flex; align-items: center; gap: 6px; }
-.swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.15); }
-.swatch.staff { background: var(--staff); }
-.swatch.la { background: var(--la); }
-.swatch.both { background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%); }
+.swatch { width: 15px; height: 15px; border-radius: 4px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.2); }
 
 /* -------------------------------------------------------------- day tabs */
 
@@ -346,19 +370,15 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .daylist .row {
   position: relative;
   display: flex; gap: 12px; align-items: center; width: 100%;
-  background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--staff);
-  border-radius: var(--radius); padding: 12px 14px; cursor: pointer; text-align: left;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px 12px 20px; cursor: pointer; text-align: left;
+  overflow: hidden;
 }
-.daylist .row.la { border-left-color: var(--la); }
+.daylist .row .edge {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 8px; display: flex; flex-direction: column;
+}
+.daylist .row .edge .room { flex: 1; }
 .daylist .row.selected { box-shadow: 0 0 0 2px var(--focus); }
-/* border-image would paint the gradient onto all four edges, so the split
-   left edge is drawn as its own layer instead. */
-.daylist .row.both { border-left-color: transparent; }
-.daylist .row.both::before {
-  content: ""; position: absolute; left: -6px; top: -1px; bottom: -1px; width: 6px;
-  background: linear-gradient(var(--staff) 0 50%, var(--la) 50% 100%);
-  border-radius: var(--radius) 0 0 var(--radius);
-}
 .daygroup {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   padding: 14px 2px 4px; flex-wrap: wrap;
