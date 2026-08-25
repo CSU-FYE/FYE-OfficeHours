@@ -209,7 +209,11 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 }
 .menu label:hover { background: var(--surface-2); }
 .menu input { accent-color: var(--green-500); width: 16px; height: 16px; }
-.menu .count { margin-left: auto; color: var(--ink-3); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.menu .group {
+  padding: 10px 9px 4px; font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3);
+}
+.menu .group:first-child { padding-top: 4px; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
 
 .clear {
@@ -251,7 +255,6 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   padding: 9px 6px; text-align: center;
 }
 .grid .head .dow { font-weight: 600; font-size: 0.95rem; }
-.grid .head .date { color: var(--ink-2); font-size: 0.78rem; }
 .grid .head.today { background: color-mix(in srgb, var(--csu-bar) 16%, var(--surface-2)); }
 .grid .head.today .dow::after {
   content: "Today"; display: block; font-size: 0.66rem; font-weight: 600;
@@ -262,9 +265,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 
 .times { position: relative; border-right: 1px solid var(--line); }
 .times .label {
-  position: absolute; right: 8px; transform: translateY(-50%);
+  position: absolute; right: 14px; transform: translateY(-50%);
   font-size: 0.76rem; color: var(--ink-2); font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  white-space: nowrap; font-weight: 500;
+}
+.times .tick {
+  position: absolute; right: 0; width: 7px; height: 0;
+  border-top: 1px solid var(--line);
 }
 
 .col { position: relative; border-right: 1px solid var(--line); }
@@ -272,11 +279,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .col.today { background: color-mix(in srgb, var(--csu-bar) 6%, transparent); }
 
 /* Half-hour rules; the hour lines are darker so the eye can count. */
-.rule { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); opacity: 0.5; }
+/* Half hours barely there, hours definite — the grid should be countable at a
+   glance without competing with the blocks. */
+.rule { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); opacity: 0.35; }
 .rule.hour { opacity: 1; }
 
 .block {
-  position: absolute; left: 3px; right: 3px;
+  position: absolute; left: 4px; right: 4px;
   border: 1px solid transparent; border-radius: 7px;
   padding: 3px 7px; cursor: pointer; text-align: left; overflow: hidden;
   display: flex; align-items: center;
@@ -287,10 +296,11 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .block:active { transform: scale(0.99); }
 .block.staff { background: var(--staff); border-color: color-mix(in srgb, var(--staff) 75%, black); }
 .block.la { background: var(--la); border-color: color-mix(in srgb, var(--la) 70%, black); }
-/* Both roles present: one block split corner to corner rather than two stacked,
-   because they cover the same time — the split is the point. */
+/* Both roles present: split down the middle. A diagonal stretched into a long
+   wedge once blocks started spanning whole afternoons; a vertical split reads
+   the same at any height. */
 .block.both {
-  background: linear-gradient(105deg, var(--staff) 0 50%, var(--la) 50% 100%);
+  background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%);
   border-color: color-mix(in srgb, var(--staff) 60%, black);
 }
 
@@ -305,7 +315,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.15); }
 .swatch.staff { background: var(--staff); }
 .swatch.la { background: var(--la); }
-.swatch.both { background: linear-gradient(105deg, var(--staff) 0 50%, var(--la) 50% 100%); }
+.swatch.both { background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%); }
 
 /* -------------------------------------------------------------- day tabs */
 
@@ -314,10 +324,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   flex: 1; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 8px 4px; cursor: pointer; text-align: center;
 }
-.daytabs button .dow { display: block; font-weight: 600; font-size: 0.86rem; }
-.daytabs button .date { display: block; color: var(--ink-2); font-size: 0.72rem; }
-.daytabs button[aria-selected="true"] { background: var(--green-700); border-color: var(--green-700); color: #fff; }
-.daytabs button[aria-selected="true"] .date { color: #cfe0d6; }
+.daytabs button .dow { display: block; font-weight: 600; font-size: 0.92rem; }
+.daytabs button { padding: 10px 4px; }
+.daytabs button[aria-selected="true"] { background: var(--csu-bar); border-color: var(--csu-bar); color: #fff; }
 
 .daylist { display: flex; flex-direction: column; gap: 8px; }
 .daylist .row {

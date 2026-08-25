@@ -12,7 +12,11 @@ import {
 } from "./data.js";
 
 const WORKBOOK = "data/office-hours.xlsx";
-const SLOT_H = 26;
+const SLOT_H = 28;
+// Breathing room above the first hour line so the 9 AM label is not clipped.
+// Every absolutely positioned thing in the grid measures from here.
+const GRID_PAD = 12;
+const slotTop = (slot) => GRID_PAD + slot * SLOT_H;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, className, text) => {
@@ -130,35 +134,39 @@ const matches = (shift) =>
   (!filters.mode.size || filters.mode.has(shift.mode)) &&
   (!filters.person.size || filters.person.has(shift.person.key));
 
+// Learning Assistants first: they are the largest group and the one a student
+// is most likely to be looking for by name.
+const PERSON_GROUPS = ["la", "gtf", "faculty"];
+const GROUP_LABELS = { la: "Learning Assistants", gtf: "GTFs", faculty: "Faculty" };
+
 function filterDefinitions() {
-  const countBy = (predicate) => model.shifts.filter(predicate).length;
-  const people = [...model.people.values()]
-    .filter((p) => p.shifts.length)
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  const has = (predicate) => model.shifts.some(predicate);
+  const people = [...model.people.values()].filter((p) => p.shifts.length);
 
   return [
     {
       key: "course", label: "Course",
-      options: model.courses.map((c) => ({
-        value: c, label: c, count: countBy((s) => s.courses.includes(c)),
-      })),
+      options: model.courses.map((c) => ({ value: c, label: c })),
     },
     {
       key: "role", label: "Who",
-      options: model.roles.map((r) => ({
-        value: r, label: ROLE_LABELS[r], count: countBy((s) => s.person.role === r),
-      })),
+      options: model.roles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
     },
     {
       key: "mode", label: "Format",
       options: [
-        { value: "in-person", label: "In person", count: countBy((s) => s.mode === "in-person") },
-        { value: "online", label: "Online", count: countBy((s) => s.mode === "online") },
-      ].filter((o) => o.count),
+        { value: "in-person", label: "In person", show: has((s) => s.mode === "in-person") },
+        { value: "online", label: "Online", show: has((s) => s.mode === "online") },
+      ].filter((o) => o.show),
     },
     {
       key: "person", label: "Person",
-      options: people.map((p) => ({ value: p.key, label: p.displayName, count: p.shifts.length })),
+      options: PERSON_GROUPS.flatMap((role) =>
+        people
+          .filter((p) => p.role === role)
+          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+          .map((p) => ({ value: p.key, label: p.displayName, group: GROUP_LABELS[role] }))
+      ),
     },
   ].filter((f) => f.options.length > 1);
 }
@@ -177,7 +185,12 @@ function buildFilters() {
 
     const menu = el("div", "menu");
     menu.hidden = true;
+    let currentGroup = null;
     for (const option of def.options) {
+      if (option.group && option.group !== currentGroup) {
+        currentGroup = option.group;
+        menu.append(el("div", "group", currentGroup));
+      }
       const label = el("label");
       const input = el("input");
       input.type = "checkbox";
@@ -189,7 +202,7 @@ function buildFilters() {
         syncFilterButtons();
         renderAll();
       });
-      label.append(input, el("span", null, option.label), el("span", "count", String(option.count)));
+      label.append(input, el("span", null, option.label));
       menu.append(label);
     }
 
@@ -276,10 +289,17 @@ function renderAll() {
   renderDayList();
   $("legend").hidden = false;
   $("footnote").textContent =
-    "Availability shown for this week. Schedules can change — check back before you head over.";
+    "This schedule runs every week of the term. Hours can change — check back before you head over.";
 }
 
-/** Slot-by-slot availability for one day, collapsed into blocks of identical people. */
+/**
+ * One block per unbroken stretch of availability.
+ *
+ * Splitting on every change of staffing drew a seam whenever one person handed
+ * over to another, which told a student nothing they could act on — help is
+ * either there or it isn't. So adjacent occupied slots merge into a single
+ * block however much the roster churns inside it.
+ */
 function blocksFor(day) {
   const rows = [];
   for (let i = 0; i < model.slotCount; i++) {
@@ -291,19 +311,50 @@ function blocksFor(day) {
   let i = 0;
   while (i < model.slotCount) {
     if (!rows[i].length) { i++; continue; }
-    const signature = (entries) => entries.map((e) => e.person.key).sort().join("|");
-    const key = signature(rows[i]);
     let j = i;
-    while (j + 1 < model.slotCount && signature(rows[j + 1]) === key) j++;
+    while (j + 1 < model.slotCount && rows[j + 1].length) j++;
     blocks.push({
       startSlot: i, endSlot: j,
       start: model.dayStart + i * SLOT_MINUTES,
       end: model.dayStart + (j + 1) * SLOT_MINUTES,
-      entries: rows[i],
+      entries: peopleAcross(rows, i, j),
     });
     i = j + 1;
   }
   return blocks;
+}
+
+/**
+ * Who is present across a merged block, and for how long each.
+ * Back-to-back shifts in the same place read as one stretch, so a 4–5 and a
+ * 5–6 by the same person becomes "here 4 PM–6 PM" rather than two entries.
+ */
+function peopleAcross(rows, from, to) {
+  const sameWhere = (a, b) => a.mode === b.mode && a.location === b.location;
+  const byPerson = new Map();
+
+  for (let i = from; i <= to; i++) {
+    for (const { person, shift } of rows[i]) {
+      let record = byPerson.get(person.key);
+      if (!record) byPerson.set(person.key, (record = { person, runs: [] }));
+      const last = record.runs[record.runs.length - 1];
+      if (last && last.endSlot === i - 1 && sameWhere(last.shift, shift)) last.endSlot = i;
+      else record.runs.push({ startSlot: i, endSlot: i, shift });
+    }
+  }
+
+  const entries = [];
+  for (const { person, runs } of byPerson.values()) {
+    for (const run of runs) {
+      entries.push({
+        person,
+        shift: run.shift,
+        start: model.dayStart + run.startSlot * SLOT_MINUTES,
+        end: model.dayStart + (run.endSlot + 1) * SLOT_MINUTES,
+      });
+    }
+  }
+  return entries;
 }
 
 /**
@@ -326,28 +377,28 @@ function renderGrid() {
   const wrap = $("grid");
   wrap.innerHTML = "";
   const grid = el("div", "grid");
-  const height = model.slotCount * SLOT_H;
+  const height = model.slotCount * SLOT_H + GRID_PAD * 2;
 
   grid.append(el("div", "head corner"));
   for (const day of week) {
     const head = el("div", `head${day.isToday ? " today" : ""}`);
-    head.append(
-      el("div", "dow", day.name),
-      el("div", "date", day.date.toLocaleDateString(undefined, { month: "short", day: "numeric" }))
-    );
+    head.append(el("div", "dow", day.name));
     grid.append(head);
   }
 
   const times = el("div", "times");
   times.style.height = `${height}px`;
-  for (let i = 0; i < model.slotCount; i++) {
+  // Label sits *on* the hour line a block starts at, the way a calendar reads —
+  // centring it in the band made blocks look half an hour out of place.
+  for (let i = 0; i <= model.slotCount; i++) {
     const minute = model.dayStart + i * SLOT_MINUTES;
-    if (minute % 60 === 0) {
-      const label = el("div", "label", formatTime(minute));
-      // Centered in the hour band rather than on its edge, so nothing is clipped.
-      label.style.top = `${(i + 1) * SLOT_H}px`;
-      times.append(label);
-    }
+    if (minute % 60) continue;
+    const label = el("div", "label", formatTime(minute));
+    label.style.top = `${slotTop(i)}px`;
+    times.append(label);
+    const tick = el("div", `tick${i === model.slotCount ? " last" : ""}`);
+    tick.style.top = `${slotTop(i)}px`;
+    times.append(tick);
   }
   grid.append(times);
 
@@ -355,9 +406,9 @@ function renderGrid() {
     const col = el("div", `col${day.isToday ? " today" : ""}`);
     col.style.height = `${height}px`;
 
-    for (let i = 1; i < model.slotCount; i++) {
+    for (let i = 0; i <= model.slotCount; i++) {
       const rule = el("div", `rule${(model.dayStart + i * SLOT_MINUTES) % 60 === 0 ? " hour" : ""}`);
-      rule.style.top = `${i * SLOT_H}px`;
+      rule.style.top = `${slotTop(i)}px`;
       col.append(rule);
     }
 
@@ -366,8 +417,9 @@ function renderGrid() {
       const who = composition(block.entries);
       const button = el("button", `block ${who.key}${slots < 2 ? " short" : ""}`);
       button.type = "button";
-      button.style.top = `${block.startSlot * SLOT_H + 2}px`;
-      button.style.height = `${slots * SLOT_H - 4}px`;
+      // Flush to the hour lines: any inset here reads as a misalignment.
+      button.style.top = `${slotTop(block.startSlot)}px`;
+      button.style.height = `${slots * SLOT_H}px`;
 
       const count = block.entries.length;
       const description =
@@ -385,7 +437,7 @@ function renderGrid() {
       const minutes = new Date().getHours() * 60 + new Date().getMinutes();
       if (minutes >= model.dayStart && minutes <= model.dayEnd) {
         const line = el("div", "nowline");
-        line.style.top = `${((minutes - model.dayStart) / SLOT_MINUTES) * SLOT_H}px`;
+        line.style.top = `${slotTop((minutes - model.dayStart) / SLOT_MINUTES)}px`;
         col.append(line);
       }
     }
@@ -405,10 +457,7 @@ function renderDayTabs() {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(day.index === activeDay));
-    button.append(
-      el("span", "dow", day.name.slice(0, 3)),
-      el("span", "date", day.date.toLocaleDateString(undefined, { day: "numeric" }))
-    );
+    button.append(el("span", "dow", day.name.slice(0, 3)));
     button.addEventListener("click", () => {
       activeDay = day.index;
       renderDayTabs();
@@ -465,18 +514,21 @@ function renderNow() {
   const heading = el("h2", null, "Right now");
   box.append(heading);
 
-  const entries =
+  // Read from the same merged blocks the grid draws, so "until" means until
+  // they actually leave, not until their current row happens to end.
+  const open =
     today && minutes >= model.dayStart && minutes < model.dayEnd
-      ? availabilityAt(model, today.iso, today.index, Math.floor(minutes / SLOT_MINUTES) * SLOT_MINUTES, matches)
-      : [];
+      ? blocksFor(today).find((b) => minutes >= b.start && minutes < b.end)
+      : null;
+  const entries = (open ? open.entries : []).filter((e) => minutes >= e.start && minutes < e.end);
 
   if (entries.length) {
     const list = el("ul");
-    for (const { person, shift } of entries) {
+    for (const { person, shift, end } of entries) {
       const item = el("li");
       item.append(el("b", null, person.displayName));
       item.append(el("span", null, ` · ${shift.mode === "online" ? "Online" : shift.location}`));
-      item.append(el("span", null, ` · until ${formatTime(shift.end)}`));
+      item.append(el("span", null, ` · until ${formatTime(end)}`));
       list.append(item);
     }
     box.append(list);
@@ -518,7 +570,7 @@ function openPanel(day, block) {
       a.person.displayName.localeCompare(b.person.displayName)
   );
 
-  for (const { person, shift } of entries) {
+  for (const { person, shift, start, end } of entries) {
     const card = el("div", "person");
     const top = el("div", "person-top");
     top.append(el("span", "person-name", person.displayName));
@@ -543,7 +595,7 @@ function openPanel(day, block) {
     } else {
       meta.append(el("div", null, `In person · ${shift.location}`));
     }
-    meta.append(el("div", null, `Here ${formatRange(shift.start, shift.end)}`));
+    meta.append(el("div", null, `Here ${formatRange(start, end)}`));
     meta.append(el("div", null, `Helps with ${shift.courses.join(", ")}`));
     if (person.email) {
       const line = el("div");
