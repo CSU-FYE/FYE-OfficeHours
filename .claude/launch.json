@@ -4,7 +4,7 @@
     {
       "name": "office-hours",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8777"],
+      "runtimeArgs": ["tools/serve.py", "8777"],
       "port": 8777
     }
   ]

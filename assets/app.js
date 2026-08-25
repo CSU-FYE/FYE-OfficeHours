@@ -801,6 +801,11 @@ function renderReport() {
   report.append(el("p", null,
     `${model.people.size} people · ${model.shifts.length} shifts · ${model.exceptions.length} exceptions loaded.`));
 
+  for (const { source, targets } of model.courseRules) {
+    report.append(el("p", null,
+      `Course rule in effect: anyone who covers ${source} is also listed under ${targets.join(", ")}.`));
+  }
+
   if (!model.problems.length) {
     report.append(el("p", "ok", "No problems found. Everything in the workbook is being displayed."));
   } else {

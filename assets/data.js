@@ -17,6 +17,7 @@ const DEFAULTS = {
   day_start: "9:00 AM",
   day_end: "9:00 PM",
   default_courses: "ENGR 111; ENGR 114",
+  course_implies: "",
   default_location_faculty: "AV C147",
   default_location_gtf: "AV C147",
   default_location_la: "AV C144",
@@ -118,6 +119,45 @@ export function parseCourses(value) {
     .filter(Boolean);
 }
 
+/**
+ * "ENGR 111 -> ENGR 123; X -> Y, Z" — courses that come free with another one.
+ * Kept in the settings sheet rather than in code so a new pairing is a cell
+ * edit, and so the rule is visible to whoever maintains the schedule.
+ */
+export function parseCourseRules(value) {
+  const rules = [];
+  for (const part of str(value).split(";")) {
+    const [from, to] = part.split(/->|→/);
+    if (!from || !to) continue;
+    const source = parseCourses(from)[0];
+    const targets = parseCourses(to);
+    if (source && targets.length) rules.push({ source, targets });
+  }
+  return rules;
+}
+
+/** Add every course implied by the ones already listed. */
+export function expandCourses(courses, rules) {
+  if (!rules.length) return courses;
+  const out = [...courses];
+  // Bounded rather than recursive: a chained rule still resolves, and a rule
+  // that points back at itself cannot spin.
+  for (let pass = 0; pass < 5; pass++) {
+    let added = false;
+    for (const { source, targets } of rules) {
+      if (!out.includes(source)) continue;
+      for (const target of targets) {
+        if (!out.includes(target)) {
+          out.push(target);
+          added = true;
+        }
+      }
+    }
+    if (!added) break;
+  }
+  return out;
+}
+
 function normalizeDay(value) {
   const s = str(value).toLowerCase();
   return DAYS.find((d) => d.toLowerCase().startsWith(s.slice(0, 3))) || null;
@@ -156,7 +196,9 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
 
   const dayStart = parseTime(settings.day_start) ?? 9 * 60;
   const dayEnd = parseTime(settings.day_end) ?? 21 * 60;
-  const defaultCourses = parseCourses(settings.default_courses);
+  const courseRules = parseCourseRules(settings.course_implies);
+  const expand = (courses) => expandCourses(courses, courseRules);
+  const defaultCourses = expand(parseCourses(settings.default_courses));
   const defaultLocation = (role) => str(settings[`default_location_${role}`]);
 
   if (!peopleRows.length) {
@@ -182,7 +224,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
         `"${name}" has role "${str(r.role) || "(blank)"}". Use faculty, gtf, or la. This person and their shifts are hidden.`);
       continue;
     }
-    const courses = parseCourses(r.courses);
+    const courses = expand(parseCourses(r.courses));
     people.set(key, {
       key,
       name,
@@ -241,7 +283,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       problem("warning", "shifts", r.__row,
         `${rawName} ${day}: mode "${str(r.mode)}" is not recognized, treated as in-person.`);
     }
-    const courses = parseCourses(r.courses);
+    const courses = expand(parseCourses(r.courses));
 
     shifts.push({
       id: `s${shifts.length}`,
@@ -337,7 +379,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   const roles = ["faculty", "gtf", "la"].filter((role) => shifts.some((s) => s.person.role === role));
 
   return {
-    settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems,
+    settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems, courseRules,
     slotCount: Math.ceil((dayEnd - dayStart) / SLOT_MINUTES),
   };
 }

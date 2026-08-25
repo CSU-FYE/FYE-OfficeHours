@@ -324,6 +324,7 @@ def write_workbook(people_items, shifts):
         ("default_location_la", ROOM_DEFAULT),
         ("room_order", "AV C144; AV C141; Scott Engineering"),
         ("default_courses", "ENGR 111; ENGR 114"),
+        ("course_implies", "ENGR 111 -> ENGR 123"),
         ("timezone", "America/Denver"),
         ("announcement", ""),
     ]
@@ -346,6 +347,8 @@ def write_workbook(people_items, shifts):
         ("  role          faculty, gtf, or la. Pick from the dropdown.", False),
         ("  courses       leave BLANK if they help with the default (ENGR 111 and ENGR 114).", False),
         ("                If you fill it in, list ALL courses they cover, separated by ;", False),
+        ("                Anyone covering ENGR 111 is counted for ENGR 123 too - see the", False),
+        ("                course_implies row on the settings sheet.", False),
         ("  email, notes  optional. Both are shown to students, so keep notes short and useful.", False),
         ("", False),
         ("  Yellow cells were guessed during the migration - please check them.", False),

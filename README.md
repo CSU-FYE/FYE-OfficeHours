@@ -47,7 +47,7 @@ not a typo waiting to happen.
 | `name` | yes | The exact name used on the `shifts` sheet. Must be unique. |
 | `display_name` | | What students see, if different (e.g. `Dr. Torres`). Blank = same as `name`. |
 | `role` | yes | `faculty`, `gtf`, or `la`. |
-| `courses` | | **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. |
+| `courses` | | **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
 | `email` | | Shown to students in the detail panel. |
 | `notes` | | Shown to students. Keep it short. |
 
@@ -94,6 +94,13 @@ otherwise in `courses`.
 Nothing to configure. Type it in a person's `courses` cell and it appears as a filter
 option on the site automatically.
 
+If a course always comes along with another one, say so once in `settings` under
+`course_implies` rather than editing 44 rows. It reads
+`ENGR 111 -> ENGR 123`, meaning anyone who covers ENGR 111 is also listed under
+ENGR 123 — including everyone on the blank-cell default. Several rules are separated by
+`;`, and a rule can imply more than one course: `ENGR 111 -> ENGR 123, ENGR 124`.
+`?check=1` prints the rules that are in effect.
+
 ---
 
 ## Previewing locally
@@ -103,10 +110,13 @@ Browsers won't let a page opened straight from a folder read the workbook, so do
 preview any `.xlsx` without committing it. To see the real thing, serve the folder:
 
 ```bash
-python3 -m http.server 8777
+python3 tools/serve.py
 ```
 
-Then open <http://localhost:8777>.
+Then open <http://localhost:8777>. Use that rather than `python3 -m http.server`: the stock
+server sends no cache headers, so a browser will serve a stale `app.js` after you edit it and
+you end up debugging a change that never loaded. GitHub Pages sends a real `max-age`, so this
+only affects local previews.
 
 ## Publishing to GitHub Pages
 
