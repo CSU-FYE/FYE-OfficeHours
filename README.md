@@ -165,9 +165,13 @@ After that, every `git push` republishes it.
   stays live, so you can step along the hours; on a phone it is a sheet.
 - Blocks carry no visible text, so the colour is also written into each block's hover
   tooltip and its screen-reader label — colour is never the only way to read the grid.
-- A filter with only one possible value stays hidden. **Format** appears once somebody has
-  online hours; **Where** (AV vs Elsewhere) appears once something is booked outside the
-  AV building. Online counts as Elsewhere.
+- A filter with only one possible value stays hidden, so **Where** only offers the choices
+  that exist: *In the AV building*, *Online*, *Elsewhere on campus*. There is no separate
+  in-person/online filter — Where covers it, and two filters answering the same question
+  was just clutter.
+- **Online hours are a "room"** as far as colour goes: they get their own swatch and legend
+  entry. Put the meeting URL in the `location` cell and the panel turns it into a
+  *join the meeting* link.
 - Filter choices are stored in the URL, so a filtered view can be linked to directly:
   `.../#course=ENGR+114&mode=online` links straight to online ENGR 114 help.
 - Rows the site can't read are hidden from students, never shown as errors. `?check=1` is

@@ -55,6 +55,31 @@ nobody holds. If you confirm a pair, just rename in the workbook.
 `Dr. Dan`, `Dr. Harvey`, `Dr. Yume`, `Winnie`, `Ojo`, `Sumaiya` and `Ben` appear only as
 these short forms. Full names would let students search for them by surname.
 
+## Later update: `office-hours fall 26.xlsx` (25 Aug 2026)
+
+A refreshed copy of the original grid workbook arrived and was diffed against the
+standardized workbook rather than re-migrated, so the roles, demo rows and settings
+survived. What it changed:
+
+- **Four LA shifts became online.** In the source these are marked by a **yellow fill**,
+  with cell B14 (`Online Office hours`, also yellow) acting as the key, and the Teams URL
+  attached as the cell's hyperlink: Sofia Hiller (Mon 3–4), Sophie DeMatteo (Tue 3–4),
+  Tucker Cullen (Thu 2–3), Olivia Kalinowski (Fri 2–3).
+- **Prof Scheller's Tuesday 3–4 PM shift was removed.**
+- Nothing was added, and no other times moved.
+
+Two things in that file were **not** acted on, and are open questions:
+
+1. The `Professor & GTFs` sheet has 23 cells filled **light blue** (`#C0E6F5`) with no key
+   anywhere in the workbook and no hyperlinks. If that means something, say what and it can
+   be applied.
+2. Kacey Hoang (Wed 11–12) carries a *different* fill from the online yellow and has no
+   link, so she was left as in person.
+
+Also note the source still writes `(AV 147)` beside several faculty names — and the refresh
+even added it to Dr. Dan's two cells — but the standing instruction is that all faculty and
+GTF hours are in **AV C144**, so those annotations were ignored.
+
 ## What was normalized automatically
 
 - `3pm to 4pm` and `11 am to 12 pm ` (trailing space) → consistent `3:00 PM` / `11:00 AM` times

@@ -32,9 +32,7 @@ let activeDay = 0;
 // Which hour the reader has picked, so the grid can outline it. Kept out of the
 // block geometry on purpose: the block stays one shape, the outline moves.
 let selection = null;
-const filters = {
-  course: new Set(), role: new Set(), mode: new Set(), building: new Set(), person: new Set(),
-};
+const filters = { course: new Set(), role: new Set(), building: new Set(), person: new Set() };
 
 /* ------------------------------------------------------------------ boot */
 
@@ -138,7 +136,6 @@ function currentWeek() {
 const matches = (shift) =>
   (!filters.course.size || shift.courses.some((c) => filters.course.has(c))) &&
   (!filters.role.size || filters.role.has(shift.person.role)) &&
-  (!filters.mode.size || filters.mode.has(shift.mode)) &&
   (!filters.building.size || filters.building.has(buildingOf(shift))) &&
   (!filters.person.size || filters.person.has(shift.person.key));
 
@@ -161,18 +158,12 @@ function filterDefinitions() {
       options: model.roles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
     },
     {
-      key: "mode", label: "Format",
-      options: [
-        { value: "in-person", label: "In person", show: has((s) => s.mode === "in-person") },
-        { value: "online", label: "Online", show: has((s) => s.mode === "online") },
-      ].filter((o) => o.show),
-    },
-    {
       key: "building", label: "Where",
       options: [
-        { value: "AV", label: "AV", show: has((s) => buildingOf(s) === "AV") },
-        { value: "Elsewhere", label: "Elsewhere", show: has((s) => buildingOf(s) === "Elsewhere") },
-      ].filter((o) => o.show),
+        { value: "AV", label: "In the AV building" },
+        { value: "Online", label: "Online" },
+        { value: "Elsewhere", label: "Elsewhere on campus" },
+      ].filter((o) => has((s) => buildingOf(s) === o.value)),
     },
     {
       key: "person", label: "Person",
@@ -422,8 +413,11 @@ const isSelected = (day, section) =>
 /** Where a shift meets. An online shift's "room" is the word Online, never its URL. */
 const roomOf = (shift) => (shift.mode === "online" ? "Online" : shift.location || "Room TBC");
 
-/** AV or not — the distinction behind the Where filter. Online counts as elsewhere. */
-const buildingOf = (shift) => (/^av\b/i.test(roomOf(shift)) ? "AV" : "Elsewhere");
+/** The Where filter: in the AV building, online, or somewhere else on campus. */
+function buildingOf(shift) {
+  if (shift.mode === "online") return "Online";
+  return /^av\b/i.test(roomOf(shift)) ? "AV" : "Elsewhere";
+}
 
 /**
  * Every room in use, in the order their colours are assigned. `room_order` in

@@ -32,14 +32,20 @@
   --gold: #c8a45c;
 
   /* Rooms, in palette order. Hue alone fails a colour-blind reader, so every
-     other room also carries a texture: the pattern, not the hue, is what tells
-     two rooms apart in greyscale or with deuteranopia. */
+     room past the first also carries a texture: the pattern, not the hue, is
+     what tells two rooms apart in greyscale or with deuteranopia.
+     The textures are hairlines rather than bands — fine enough to read as a
+     surface, so the hue still carries the identity. */
   --room-0: #1e4d2b;
-  --room-1: #ffc038;
-  --room-2: #0088b0;
-  --room-3: #d9782e;
-  --room-4: #5b3f8c;
+  --room-1: #e8a91c;
+  --room-2: #0f7d92;
+  --room-3: #6a4b9c;
+  --room-4: #b0522e;
   --room-5: #4a5568;
+
+  /* Texture ink: dark over the light fills, light over the dark ones. */
+  --tex-light: rgb(255 255 255 / 0.32);
+  --tex-dark: rgb(0 0 0 / 0.20);
 
   --bg: #f6f5f1;
   --surface: #ffffff;
@@ -77,11 +83,13 @@
     --focus: #6fc9a1;
 
     --room-0: #2f7a4a;
-    --room-1: #e0a52e;
-    --room-2: #2f9fc4;
-    --room-3: #cc7433;
-    --room-4: #7a5cae;
+    --room-1: #d9a331;
+    --room-2: #2f9fb4;
+    --room-3: #8a6cc4;
+    --room-4: #c4703f;
     --room-5: #5d6b7a;
+    --tex-light: rgb(255 255 255 / 0.28);
+    --tex-dark: rgb(0 0 0 / 0.22);
   }
 }
 
@@ -317,31 +325,41 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
     inset 0 0 0 2px rgb(255 255 255 / 0.95),
     inset 0 0 0 4px rgb(0 0 0 / 0.55);
 }
-.room.r0 { background: var(--room-0); }
-.room.r1 { background: var(--room-1); }
-.room.r2 { background: var(--room-2); }
-.room.r3 { background: var(--room-3); }
-.room.r4 { background: var(--room-4); }
-.room.r5 { background: var(--room-5); }
+.room { background-color: var(--room-0); }
+.room.r0 { background-color: var(--room-0); }
+.room.r1 { background-color: var(--room-1); }
+.room.r2 { background-color: var(--room-2); }
+.room.r3 { background-color: var(--room-3); }
+.room.r4 { background-color: var(--room-4); }
+.room.r5 { background-color: var(--room-5); }
 
-/* Textures on the odd-numbered rooms. Sized in absolute units so a stripe
-   looks the same in a tall block and in a 12px legend chip. */
+/* Hairline textures, sized in absolute units so one looks the same in a tall
+   block and in a 15px legend chip. */
 .room.r1 {
   background-image: repeating-linear-gradient(
-    45deg, rgb(0 0 0 / 0.34) 0 4px, transparent 4px 9px);
-}
-.room.r3 {
-  background-image:
-    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.4) 0 3px, transparent 3px 8px),
-    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.4) 0 3px, transparent 3px 8px);
-}
-.room.r5 {
-  background-image: repeating-linear-gradient(
-    -45deg, rgb(255 255 255 / 0.32) 0 4px, transparent 4px 9px);
+    45deg, var(--tex-dark) 0 1px, transparent 1px 6px);
 }
 .room.r2 {
-  background-image: radial-gradient(rgb(255 255 255 / 0.55) 1.6px, transparent 1.7px);
-  background-size: 9px 9px;
+  /* Two offset lattices make a diamond of dots rather than a square mesh,
+     which stops it reading as moire at small sizes. */
+  background-image:
+    radial-gradient(var(--tex-light) 1.1px, transparent 1.2px),
+    radial-gradient(var(--tex-light) 1.1px, transparent 1.2px);
+  background-size: 10px 10px;
+  background-position: 0 0, 5px 5px;
+}
+.room.r3 {
+  background-image: repeating-linear-gradient(
+    -45deg, var(--tex-light) 0 1px, transparent 1px 6px);
+}
+.room.r4 {
+  background-image: repeating-linear-gradient(
+    0deg, var(--tex-light) 0 1px, transparent 1px 6px);
+}
+.room.r5 {
+  background-image:
+    repeating-linear-gradient(45deg, var(--tex-light) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(-45deg, var(--tex-light) 0 1px, transparent 1px 11px);
 }
 
 
@@ -353,7 +371,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; color: var(--ink-2); font-size: 0.84rem; }
 .key { display: flex; align-items: center; gap: 6px; }
-.swatch { width: 15px; height: 15px; border-radius: 4px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.2); }
+.swatch { width: 18px; height: 18px; border-radius: 4px; display: inline-block; border: 1px solid rgb(0 0 0 / 0.2); }
 
 /* -------------------------------------------------------------- day tabs */
 
