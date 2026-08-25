@@ -29,6 +29,9 @@ const el = (tag, className, text) => {
 let model = null;
 let week = [];
 let activeDay = 0;
+// Which hour the reader has picked, so the grid can outline it. Kept out of the
+// block geometry on purpose: the block stays one shape, the outline moves.
+let selection = null;
 const filters = { course: new Set(), role: new Set(), mode: new Set(), person: new Set() };
 
 /* ------------------------------------------------------------------ boot */
@@ -149,7 +152,7 @@ function filterDefinitions() {
       options: model.courses.map((c) => ({ value: c, label: c })),
     },
     {
-      key: "role", label: "Who",
+      key: "role", label: "Role",
       options: model.roles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
     },
     {
@@ -358,6 +361,31 @@ function peopleAcross(rows, from, to) {
 }
 
 /**
+ * An unbroken block is still clickable hour by hour. The block is drawn as one
+ * shape so a student cannot read the shift rota off the grid, but each hour is
+ * its own target, so clicking asks "who is here at 2 PM" rather than "who is
+ * here sometime this afternoon".
+ */
+function sectionsFor(block) {
+  const sections = [];
+  for (let start = block.start; start < block.end; ) {
+    const end = Math.min(block.end, Math.floor(start / 60) * 60 + 60);
+    sections.push({ start, end, entries: entriesBetween(block, start, end) });
+    start = end;
+  }
+  return sections;
+}
+
+const entriesBetween = (block, start, end) =>
+  block.entries.filter((entry) => entry.start < end && start < entry.end);
+
+const isSelected = (day, section) =>
+  selection &&
+  selection.dayIndex === day.index &&
+  selection.start === section.start &&
+  selection.end === section.end;
+
+/**
  * What kind of help is on offer in a block. Faculty and GTFs read as one group
  * to a student deciding where to go; the distinction between them is in the
  * detail panel and the Who filter.
@@ -414,23 +442,33 @@ function renderGrid() {
 
     for (const block of blocksFor(day)) {
       const slots = block.endSlot - block.startSlot + 1;
-      const who = composition(block.entries);
-      const button = el("button", `block ${who.key}${slots < 2 ? " short" : ""}`);
-      button.type = "button";
+      // Colour describes the whole stretch, never the hour, so the fill stays
+      // flat and the hand-overs inside it stay invisible.
+      const shape = el("div", `block ${composition(block.entries).key}`);
       // Flush to the hour lines: any inset here reads as a misalignment.
-      button.style.top = `${slotTop(block.startSlot)}px`;
-      button.style.height = `${slots * SLOT_H}px`;
+      shape.style.top = `${slotTop(block.startSlot)}px`;
+      shape.style.height = `${slots * SLOT_H}px`;
 
-      const count = block.entries.length;
-      const description =
-        `${day.name} ${formatRange(block.start, block.end)}: ${who.label} available ` +
-        `(${count} ${count === 1 ? "person" : "people"}).`;
-      // The block itself carries no text, so the label has to say what the
-      // colour says — for screen readers and for anyone hovering.
-      button.setAttribute("aria-label", `${description} Open details.`);
-      button.title = description;
-      button.addEventListener("click", () => openPanel(day, block));
-      col.append(button);
+      for (const section of sectionsFor(block)) {
+        const button = el("button", "section");
+        button.type = "button";
+        button.style.top = `${((section.start - block.start) / SLOT_MINUTES) * SLOT_H}px`;
+        button.style.height = `${((section.end - section.start) / SLOT_MINUTES) * SLOT_H}px`;
+        if (isSelected(day, section)) button.classList.add("selected");
+
+        const count = section.entries.length;
+        const description =
+          `${day.name} ${formatRange(section.start, section.end)}: ` +
+          `${composition(section.entries).label} available ` +
+          `(${count} ${count === 1 ? "person" : "people"}).`;
+        // The grid carries no text, so the label has to say what the colour says.
+        button.setAttribute("aria-label", `${description} Open details.`);
+        button.title = description;
+        button.addEventListener("click", () => selectSection(day, section));
+        shape.append(button);
+      }
+
+      col.append(shape);
     }
 
     if (day.isToday) {
@@ -480,14 +518,27 @@ function renderDayList() {
   }
   for (const block of blocks) {
     const who = composition(block.entries);
-    const row = el("button", `row ${who.key}`);
-    row.type = "button";
-    row.append(
-      el("span", "when", formatRange(block.start, block.end)),
-      el("span", "what", who.short)
+    // Said once for the whole stretch. Repeating it on every hour was noise,
+    // and there is no legend on a phone to carry the colour on its own.
+    const head = el("div", "daygroup");
+    head.append(
+      el("span", "range", formatRange(block.start, block.end)),
+      el("span", `tag ${who.key}`, who.short)
     );
-    row.addEventListener("click", () => openPanel(day, block));
-    list.append(row);
+    list.append(head);
+
+    for (const section of sectionsFor(block)) {
+      const row = el("button", `row ${who.key}`);
+      row.type = "button";
+      if (isSelected(day, section)) row.classList.add("selected");
+      row.append(el("span", "when", formatRange(section.start, section.end)));
+      row.setAttribute(
+        "aria-label",
+        `${day.name} ${formatRange(section.start, section.end)}: ${composition(section.entries).label} available.`
+      );
+      row.addEventListener("click", () => selectSection(day, section));
+      list.append(row);
+    }
   }
   host.append(list);
 }
@@ -556,15 +607,22 @@ function nextOpening(minutesNow) {
 
 let lastFocused = null;
 
-function openPanel(day, block) {
+function selectSection(day, section) {
+  selection = { dayIndex: day.index, start: section.start, end: section.end };
+  renderGrid();
+  renderDayList();
+  openPanel(day, section);
+}
+
+function openPanel(day, section) {
   lastFocused = document.activeElement;
-  $("panel-title").textContent = `${day.name}, ${day.date.toLocaleDateString(undefined, { month: "long", day: "numeric" })}`;
-  $("panel-sub").textContent = formatRange(block.start, block.end);
+  $("panel-title").textContent = day.name;
+  $("panel-sub").textContent = formatRange(section.start, section.end);
 
   const body = $("panel-body");
   body.innerHTML = "";
 
-  const entries = [...block.entries].sort(
+  const entries = [...section.entries].sort(
     (a, b) =>
       ["faculty", "gtf", "la"].indexOf(a.person.role) - ["faculty", "gtf", "la"].indexOf(b.person.role) ||
       a.person.displayName.localeCompare(b.person.displayName)
@@ -610,15 +668,25 @@ function openPanel(day, block) {
     body.append(card);
   }
 
-  $("scrim").hidden = false;
+  // On a phone the panel is a sheet over the page, so it traps focus and dims
+  // what is behind it. On a desktop it is a side rail: the grid stays lit and
+  // clickable, so a reader can step along the hours and watch the panel follow.
+  const sheet = window.matchMedia("(max-width: 760px)").matches;
+  $("scrim").hidden = !sheet;
   $("panel").hidden = false;
-  $("panel-close").focus();
+  $("panel").toggleAttribute("aria-modal", sheet);
+  document.body.classList.add("panel-open");
+  if (sheet) $("panel-close").focus();
 }
 
 function closePanel() {
   $("panel").hidden = true;
   $("scrim").hidden = true;
-  if (lastFocused) lastFocused.focus();
+  document.body.classList.remove("panel-open");
+  selection = null;
+  renderGrid();
+  renderDayList();
+  if (lastFocused && lastFocused.isConnected) lastFocused.focus();
 }
 
 $("panel-close").addEventListener("click", closePanel);

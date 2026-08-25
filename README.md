@@ -140,6 +140,13 @@ After that, every `git push` republishes it.
   one block rather than two.
 - Block colour follows whatever is *currently filtered*. Filter to Learning Assistants and
   every block turns gold, because that is all that is left.
+- A block is drawn as one unbroken shape covering a whole stretch of availability, so
+  **students cannot read individual shift times off the grid**. Colour describes the
+  stretch, never the hour, so there is no seam where one person hands over to another.
+  Applying the Person filter is what reveals an individual's hours.
+- Even so, each block is clickable **hour by hour**. Clicking outlines that hour and the
+  panel lists only who is there then. On a desktop the panel is a side rail and the grid
+  stays live, so you can step along the hours; on a phone it is a sheet.
 - Blocks carry no visible text, so the colour is also written into each block's hover
   tooltip and its screen-reader label — colour is never the only way to read the grid.
 - A filter with only one possible value stays hidden — the **Format** filter appears once
