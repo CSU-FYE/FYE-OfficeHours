@@ -8,3 +8,7 @@
 # Python
 __pycache__/
 *.pyc
+
+# Original schedules, kept locally for reference. Not published: Sheet2 of the
+# LA workbook holds raw survey responses with personal comments.
+source-data/
