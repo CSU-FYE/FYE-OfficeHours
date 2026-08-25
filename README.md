@@ -149,10 +149,12 @@ After that, every `git push` republishes it.
 - Consecutive hours by the same person merge into one block, so a 4–6 PM shift reads as
   one block rather than two.
 - **Rooms colour themselves.** Type a new room into a `location` cell and it gets its own
-  colour and a legend entry with no code change. Every other room in the palette also
+  colour, a legend entry, and a **Where** option with no code change. Every other room in the palette also
   carries a texture — stripes, dots — so two rooms stay distinguishable in greyscale or
   to a colour-blind reader; hue is never the only difference. `room_order` in `settings`
   pins which room gets which colour, so "green is C144" stays true as the schedule grows.
+  A room named there **keeps its colour even while it has no hours**, so a room going quiet
+  for a term does not reshuffle the colours of the ones that remain.
 - A half hour split across two rooms shows both colours side by side.
 - Block colour follows whatever is *currently filtered*, and the legend narrows with it.
 - A block is one outlined shape covering an unbroken stretch of availability, with the
@@ -165,10 +167,12 @@ After that, every `git push` republishes it.
   stays live, so you can step along the hours; on a phone it is a sheet.
 - Blocks carry no visible text, so the colour is also written into each block's hover
   tooltip and its screen-reader label — colour is never the only way to read the grid.
-- A filter with only one possible value stays hidden, so **Where** only offers the choices
-  that exist: *In the AV building*, *Online*, *Elsewhere on campus*. There is no separate
-  in-person/online filter — Where covers it, and two filters answering the same question
-  was just clutter.
+- **Every filter option names something that really has hours behind it.** Where is built
+  from the buildings actually in use, so it never offers a place nobody is sitting in. The
+  `buildings` setting groups rooms that share a building (`AV -> Academic Village`); a room
+  with no rule is its own building, so somewhere new needs no rule to show up. Filters with
+  only one possible value hide entirely. There is no separate in-person/online filter —
+  Where covers it.
 - **Online hours are a "room"** as far as colour goes: they get their own swatch and legend
   entry. Put the meeting URL in the `location` cell and the panel turns it into a
   *join the meeting* link.

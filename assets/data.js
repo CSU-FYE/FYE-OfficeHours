@@ -120,11 +120,12 @@ export function parseCourses(value) {
 }
 
 /**
- * "ENGR 111 -> ENGR 123; X -> Y, Z" — courses that come free with another one.
- * Kept in the settings sheet rather than in code so a new pairing is a cell
- * edit, and so the rule is visible to whoever maintains the schedule.
+ * "A -> B; C -> D, E" — the little arrow syntax the settings sheet uses for
+ * anything that maps one name onto others: courses that come free with another
+ * course, rooms that share a building. Kept in the sheet rather than in code so
+ * a new rule is a cell edit, and so it is visible to whoever maintains it.
  */
-export function parseCourseRules(value) {
+export function parseMappingRules(value) {
   const rules = [];
   for (const part of str(value).split(";")) {
     const [from, to] = part.split(/->|→/);
@@ -196,7 +197,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
 
   const dayStart = parseTime(settings.day_start) ?? 9 * 60;
   const dayEnd = parseTime(settings.day_end) ?? 21 * 60;
-  const courseRules = parseCourseRules(settings.course_implies);
+  const courseRules = parseMappingRules(settings.course_implies);
   const expand = (courses) => expandCourses(courses, courseRules);
   const defaultCourses = expand(parseCourses(settings.default_courses));
   const defaultLocation = (role) => str(settings[`default_location_${role}`]);

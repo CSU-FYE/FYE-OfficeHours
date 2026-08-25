@@ -83,6 +83,12 @@ row carries an explicit room; they are all blank and resolve to `default_locatio
 
 **Ben** was confirmed as **faculty** on the same date, and is no longer flagged below.
 
+## Demo rows removed (25 Aug 2026)
+
+The two `DEMO` people and their three shifts in AV C141 and Scott Engineering were deleted
+once the room colours had been reviewed. Both rooms stay named in `room_order`, so they keep
+their colours for whenever they are real.
+
 ## What was normalized automatically
 
 - `3pm to 4pm` and `11 am to 12 pm ` (trailing space) → consistent `3:00 PM` / `11:00 AM` times
