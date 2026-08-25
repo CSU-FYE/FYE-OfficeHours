@@ -22,7 +22,6 @@ not an input.
 2. **DrT** — role guessed as `faculty`. Appears only as `DrT` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · B4). Confirm the full name and whether they are faculty or a GTF.
 3. **Taylor** — role guessed as `gtf`. Appears only as `Taylor` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · C4). Confirm the full name and whether they are faculty or a GTF.
 4. **Winnie** — role guessed as `gtf`. Appears only as `Winnie` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · F4). Confirm the full name and whether they are faculty or a GTF.
-5. **Ben** — role guessed as `gtf`. Appears only as `Ben` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · D5). Confirm the full name and whether they are faculty or a GTF.
 6. **Dr. Dan** — role guessed as `faculty`. Appears only as `Dr. Dan` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · B6). Confirm the full name and whether they are faculty or a GTF.
 7. **Ojo** — role guessed as `gtf`. Appears only as `Ojo` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · E6). Confirm the full name and whether they are faculty or a GTF.
 8. **Dr. Harvey** — role guessed as `faculty`. Appears only as `Dr. Harvey` on the Faculty & GTF grid (first seen FA26_Faculty_GTF Office Hours.xlsx · Office Hours · B7). Confirm the full name and whether they are faculty or a GTF.
@@ -76,9 +75,13 @@ Two things in that file were **not** acted on, and are open questions:
 2. Kacey Hoang (Wed 11–12) carries a *different* fill from the online yellow and has no
    link, so she was left as in person.
 
-Also note the source still writes `(AV 147)` beside several faculty names — and the refresh
-even added it to Dr. Dan's two cells — but the standing instruction is that all faculty and
-GTF hours are in **AV C144**, so those annotations were ignored.
+The source still writes `(AV 147)` beside several faculty names — and the refresh even added
+it to Dr. Dan's two cells — but this was **confirmed on 25 Aug 2026**: all faculty and GTF
+hours are in **AV C144**, so every `(AV 147)` in the source is stale and is ignored. No shift
+row carries an explicit room; they are all blank and resolve to `default_location_*` in
+`settings`, so if the rooms ever change again it is a one-cell edit.
+
+**Ben** was confirmed as **faculty** on the same date, and is no longer flagged below.
 
 ## What was normalized automatically
 

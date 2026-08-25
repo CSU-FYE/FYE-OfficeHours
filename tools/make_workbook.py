@@ -36,6 +36,11 @@ ROOM_LA = "AV C144"
 # blanks written above resolve to this.
 ROOM_DEFAULT = "AV C144"
 
+# Roles confirmed by the office since the migration. Not flagged for review.
+CONFIRMED_ROLES = {
+    "Ben": "faculty",
+}
+
 # Roles we could not read off the source with certainty. Every name here is
 # reported in MIGRATION-NOTES.md for review.
 GUESSED_ROLES = {
@@ -46,7 +51,6 @@ GUESSED_ROLES = {
     "Prof Scheller": "faculty",
     "Chloe": "gtf",
     "Taylor": "gtf",
-    "Ben": "gtf",
     "Winnie": "gtf",
     "Ojo": "gtf",
     "Sumaiya": "gtf",
@@ -182,6 +186,9 @@ def main():
 
     for name, info in people.items():
         if info["role"] is None:
+            if name in CONFIRMED_ROLES:
+                info["role"] = CONFIRMED_ROLES[name]
+                continue
             info["role"] = GUESSED_ROLES.get(name, "gtf")
             info["guessed"] = True
             flag(
