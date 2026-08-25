@@ -379,6 +379,27 @@ function sectionsFor(block) {
 const entriesBetween = (block, start, end) =>
   block.entries.filter((entry) => entry.start < end && start < entry.end);
 
+/**
+ * Colour bands within a block, at the model's own half-hour resolution.
+ *
+ * Painting a whole stretch with the union of its roles was a lie: an afternoon
+ * that ends with a lone LA was still showing faculty green. Bands are merged
+ * only where the composition is actually unchanged, so a seam now means the
+ * mix really did change — not that somebody's shift happened to tick over.
+ */
+function fillsFor(block) {
+  const fills = [];
+  for (let start = block.start; start < block.end; start += SLOT_MINUTES) {
+    const entries = entriesBetween(block, start, start + SLOT_MINUTES);
+    if (!entries.length) continue;
+    const key = composition(entries).key;
+    const last = fills[fills.length - 1];
+    if (last && last.key === key && last.end === start) last.end = start + SLOT_MINUTES;
+    else fills.push({ start, end: start + SLOT_MINUTES, key });
+  }
+  return fills;
+}
+
 const isSelected = (day, section) =>
   selection &&
   selection.dayIndex === day.index &&
@@ -442,18 +463,24 @@ function renderGrid() {
 
     for (const block of blocksFor(day)) {
       const slots = block.endSlot - block.startSlot + 1;
-      // Colour describes the whole stretch, never the hour, so the fill stays
-      // flat and the hand-overs inside it stay invisible.
-      const shape = el("div", `block ${composition(block.entries).key}`);
+      const shape = el("div", "block");
       // Flush to the hour lines: any inset here reads as a misalignment.
       shape.style.top = `${slotTop(block.startSlot)}px`;
       shape.style.height = `${slots * SLOT_H}px`;
 
+      const offset = (minute) => ((minute - block.start) / SLOT_MINUTES) * SLOT_H;
+      for (const fill of fillsFor(block)) {
+        const band = el("div", `fill ${fill.key}`);
+        band.style.top = `${offset(fill.start)}px`;
+        band.style.height = `${offset(fill.end) - offset(fill.start)}px`;
+        shape.append(band);
+      }
+
       for (const section of sectionsFor(block)) {
         const button = el("button", "section");
         button.type = "button";
-        button.style.top = `${((section.start - block.start) / SLOT_MINUTES) * SLOT_H}px`;
-        button.style.height = `${((section.end - section.start) / SLOT_MINUTES) * SLOT_H}px`;
+        button.style.top = `${offset(section.start)}px`;
+        button.style.height = `${offset(section.end) - offset(section.start)}px`;
         if (isSelected(day, section)) button.classList.add("selected");
 
         const count = section.entries.length;
@@ -517,21 +544,19 @@ function renderDayList() {
     list.append(el("p", "empty", "No office hours on this day with the filters you have chosen."));
   }
   for (const block of blocks) {
-    const who = composition(block.entries);
-    // Said once for the whole stretch. Repeating it on every hour was noise,
-    // and there is no legend on a phone to carry the colour on its own.
     const head = el("div", "daygroup");
-    head.append(
-      el("span", "range", formatRange(block.start, block.end)),
-      el("span", `tag ${who.key}`, who.short)
-    );
+    head.append(el("span", "range", formatRange(block.start, block.end)));
     list.append(head);
 
     for (const section of sectionsFor(block)) {
+      const who = composition(section.entries);
       const row = el("button", `row ${who.key}`);
       row.type = "button";
       if (isSelected(day, section)) row.classList.add("selected");
-      row.append(el("span", "when", formatRange(section.start, section.end)));
+      row.append(
+        el("span", "when", formatRange(section.start, section.end)),
+        el("span", "what", who.short)
+      );
       row.setAttribute(
         "aria-label",
         `${day.name} ${formatRange(section.start, section.end)}: ${composition(section.entries).label} available.`

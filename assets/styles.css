@@ -284,17 +284,20 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .rule { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); opacity: 0.35; }
 .rule.hour { opacity: 1; }
 
-/* The block is one flat shape. It is deliberately not a button: the clickable
-   thing is the hour inside it, so the fill never has to change at a hand-over
-   and the rota stays unreadable from the grid alone. */
+/* The block is the outline of a stretch of availability; the colour inside it
+   is banded per half hour. It is deliberately not a button — the clickable
+   thing is the hour inside it. */
 .block {
   position: absolute; left: 4px; right: 4px;
-  border: 1px solid transparent; border-radius: 7px;
+  border-radius: 7px;
   overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.18);
 }
 
+.fill { position: absolute; left: 0; right: 0; }
+
 .section {
-  position: absolute; left: 0; right: 0;
+  position: absolute; left: 0; right: 0; z-index: 1;
   background: none; border: 0; padding: 0; margin: 0;
   cursor: pointer; display: block;
 }
@@ -307,15 +310,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
     inset 0 0 0 2px rgb(255 255 255 / 0.95),
     inset 0 0 0 4px rgb(0 0 0 / 0.55);
 }
-.block.staff { background: var(--staff); border-color: color-mix(in srgb, var(--staff) 75%, black); }
-.block.la { background: var(--la); border-color: color-mix(in srgb, var(--la) 70%, black); }
+.fill.staff { background: var(--staff); }
+.fill.la { background: var(--la); }
 /* Both roles present: split down the middle. A diagonal stretched into a long
    wedge once blocks started spanning whole afternoons; a vertical split reads
-   the same at any height. */
-.block.both {
-  background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%);
-  border-color: color-mix(in srgb, var(--staff) 60%, black);
-}
+   the same at any height, and keeps the green column continuous down a run of
+   bands that all have faculty in them. */
+.fill.both { background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%); }
 
 .nowline { position: absolute; left: 0; right: 0; height: 2px; background: #c0392b; z-index: 5; pointer-events: none; }
 .nowline::before {
@@ -364,19 +365,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 }
 .daygroup:first-child { padding-top: 2px; }
 .daygroup .range { font-weight: 700; font-size: 0.95rem; }
-.daygroup .tag {
-  font-size: 0.78rem; color: var(--ink-2);
-  display: flex; align-items: center; gap: 7px;
-}
-.daygroup .tag::before {
-  content: ""; width: 12px; height: 12px; border-radius: 3px;
-  border: 1px solid rgb(0 0 0 / 0.15);
-}
-.daygroup .tag.staff::before { background: var(--staff); }
-.daygroup .tag.la::before { background: var(--la); }
-.daygroup .tag.both::before { background: linear-gradient(90deg, var(--staff) 0 50%, var(--la) 50% 100%); }
-
-.daylist .row .when { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+.daylist .row .when { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 0.92rem; flex: none; min-width: 122px; }
+.daylist .row .what { color: var(--ink-2); font-size: 0.88rem; }
 
 .daylist .empty { color: var(--ink-2); padding: 24px 0; text-align: center; }
 

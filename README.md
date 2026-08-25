@@ -140,10 +140,11 @@ After that, every `git push` republishes it.
   one block rather than two.
 - Block colour follows whatever is *currently filtered*. Filter to Learning Assistants and
   every block turns gold, because that is all that is left.
-- A block is drawn as one unbroken shape covering a whole stretch of availability, so
-  **students cannot read individual shift times off the grid**. Colour describes the
-  stretch, never the hour, so there is no seam where one person hands over to another.
-  Applying the Person filter is what reveals an individual's hours.
+- A block is one outlined shape covering an unbroken stretch of availability, with the
+  colour **banded per half hour** inside it. A band boundary means the *mix of roles*
+  actually changed — an afternoon that ends with only an LA on duty goes gold — but one
+  person handing over to another of the same role draws no seam, so individual shift
+  times still are not readable from the grid. The Person filter is what reveals those.
 - Even so, each block is clickable **hour by hour**. Clicking outlines that hour and the
   panel lists only who is there then. On a desktop the panel is a side rail and the grid
   stays live, so you can step along the hours; on a phone it is a sheet.
