@@ -118,6 +118,25 @@ server sends no cache headers, so a browser will serve a stale `app.js` after yo
 you end up debugging a change that never loaded. GitHub Pages sends a real `max-age`, so this
 only affects local previews.
 
+## Embedding in Canvas
+
+Add `?embed=1` to the URL and the page drops the header, the "right now" box, and the footer,
+leaving the filters and the grid. Paste this into a Canvas page with the HTML editor (the
+`</>` button):
+
+```html
+<p><iframe src="https://bengrier.github.io/FYE-OfficeHours/?embed=1"
+   title="ENGR 111/114/123 office hours" width="100%" height="900"
+   style="border: 1px solid #ddd; border-radius: 8px;"></iframe></p>
+```
+
+Canvas iframes don't grow to fit their contents, so pick a `height` and check it — 900 shows
+the whole 9am–9pm grid on a laptop. Filters still write to the URL inside the frame, so you
+can link a pre-filtered view: `?embed=1#course=ENGR%20123`. Anything after `#` is filters;
+`?embed=1` has to come before it.
+
+Students on phones get the day-by-day list instead of the grid, same as the full page.
+
 ## Publishing to GitHub Pages
 
 Once, at setup: push this folder to a GitHub repository, then in the repo go to
@@ -131,7 +150,7 @@ After that, every `git push` republishes it.
 
 | Path | What it is |
 |---|---|
-| `index.html` | The page. Also serves the check report at `?check=1`. |
+| `index.html` | The page. Also serves the check report at `?check=1` and the bare embed at `?embed=1`. |
 | `assets/styles.css` | All styling, light and dark. |
 | `assets/fonts/` | Poppins, copied from the First-Year Engineering Calendar so the banner matches. |
 | `assets/xlsx.js` | Reads `.xlsx` files in the browser. No libraries — the browser can already unzip and parse XML. |

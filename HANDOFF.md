@@ -25,7 +25,7 @@ all opt-in and mirror into the URL.
 
 | File | Does |
 |---|---|
-| `index.html` | Markup shell. Also serves the check report at `?check=1`. |
+| `index.html` | Markup shell. Also serves the check report at `?check=1`. An inline pre-paint script adds `.embed` to `<html>` for `?embed=1` (Canvas iframe: no header, no "right now", no footer — CSS only, at the bottom of `styles.css`). |
 | `assets/xlsx.js` | Reads `.xlsx` with no libraries: parses the zip central directory, inflates with `DecompressionStream('deflate-raw')`, reads sheet XML with `DOMParser`. |
 | `assets/data.js` | Workbook → model. All the forgiving parsing lives here (times, days, roles, dates, courses). Anything unparseable becomes a *problem*, never an exception. |
 | `assets/app.js` | Grid, filters, detail panel, "right now" strip, check report. |

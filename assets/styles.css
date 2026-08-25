@@ -474,6 +474,21 @@ footer { max-width: 1180px; margin: 0 auto; padding: 0 20px 30px; color: var(--i
 .report .where { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 @media (prefers-color-scheme: dark) { .report .lvl.error { color: #f0836f; } .report .lvl.warning { color: #e0b34d; } }
 
+/* ----------------------------------------------------------------- embed */
+/* ?embed=1 — just the schedule, for an iframe in Canvas. Filters, the
+   announcement and the legend stay; the chrome that repeats the page around
+   it goes. */
+
+.embed .csu-header,
+.embed .now,
+.embed .skip,
+.embed footer { display: none !important; }
+
+.embed main { padding: 14px 20px 24px; }
+.embed .announcement { margin-top: 0; }
+
+@media (max-width: 760px) { .embed main { padding: 12px 16px 20px; } }
+
 /* ---------------------------------------------------------------- mobile */
 
 @media (max-width: 760px) {
