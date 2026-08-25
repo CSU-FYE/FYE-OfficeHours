@@ -141,6 +141,7 @@ After that, every `git push` republishes it.
 | `source-data/` | The two original grid workbooks, kept for reference. Nothing reads them. |
 | `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. |
 | `MIGRATION-NOTES.md` | What that conversion had to guess. **Worth reading once.** |
+| `HANDOFF.md` | Orientation for a developer (or a new AI chat) picking this up cold. |
 
 ## Notes on how it behaves
 
