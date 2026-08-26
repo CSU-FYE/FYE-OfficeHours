@@ -115,6 +115,8 @@ Each of these was asked for deliberately, usually after seeing the alternative.
    hours. On a phone it is a modal sheet and the grid becomes a day-at-a-time list.
 8. **Every filter option names something that really has hours behind it.** Where is derived
    from buildings in use, so it cannot offer an empty place. Filters with one option hide.
+   *Get help with* ANDs across courses — two courses means hours covering both — while the
+   other three filters are unions, since a shift has only one room and one person.
 9. **No dates anywhere** — the schedule repeats weekly. Exceptions still apply to the real
    current week, just undated on screen.
 10. **A day nothing ever happens on keeps its column**, narrowed to 40px, hatched, and

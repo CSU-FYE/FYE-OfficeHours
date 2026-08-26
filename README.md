@@ -212,6 +212,11 @@ After that, every `git push` republishes it.
   with no rule is its own building, so somewhere new needs no rule to show up. Filters with
   only one possible value hide entirely. There is no separate in-person/online filter —
   Where covers it.
+- **Picking two courses narrows, it does not widen.** *Get help with* ANDs: choose ENGR 111
+  and CHEM 111 and you get only the hours where one person covers both, which is the
+  question a student with two hard classes is actually asking. Role, Where, and Person
+  stay unions — a shift has one room and one person, so ANDing those would always empty
+  the grid.
 - **Online hours are a "room"** as far as colour goes: they get their own swatch and legend
   entry. Put the meeting URL in the `location` cell and the panel turns it into a
   *join the meeting* link.

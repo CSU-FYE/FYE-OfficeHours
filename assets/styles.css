@@ -358,12 +358,31 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .room.r5 { background-color: var(--room-5); }
 
 /* Hairline textures, sized in absolute units so one looks the same in a tall
-   block and in a 15px legend chip. */
-.room.r1 {
+   block and in a 15px legend chip.
+ *
+ * The texture is not painted on the stripe itself. It is painted on a layer the
+ * size of the whole day column, pinned to that column's top-left corner, and
+ * then clipped back to the stripe. Every stripe in a column therefore draws the
+ * same lines in the same places, so a half-width band under a full-width one —
+ * or any two bands that adjoin — reads as one continuous hatch instead of each
+ * box starting the pattern over at its own corner. The grid sets --col-h and
+ * app.js sets --tex-y/--tex-i/--tex-n per stripe; away from the grid (legend
+ * chip, day list) the defaults make the layer the stripe itself, as before. */
+.room { position: relative; overflow: hidden; }
+.room::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--tex-y, 0px));
+  left: calc(-1 * var(--tex-i, 0) * 100%);
+  width: calc(var(--tex-n, 1) * 100%);
+  height: var(--col-h, 100%);
+  pointer-events: none;
+}
+.room.r1::before {
   background-image: repeating-linear-gradient(
     45deg, var(--tex-dark) 0 1px, transparent 1px 6px);
 }
-.room.r2 {
+.room.r2::before {
   /* Two offset lattices make a diamond of dots rather than a square mesh,
      which stops it reading as moire at small sizes. */
   background-image:
@@ -372,15 +391,15 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   background-size: 10px 10px;
   background-position: 0 0, 5px 5px;
 }
-.room.r3 {
+.room.r3::before {
   background-image: repeating-linear-gradient(
     -45deg, var(--tex-light) 0 1px, transparent 1px 6px);
 }
-.room.r4 {
+.room.r4::before {
   background-image: repeating-linear-gradient(
     0deg, var(--tex-light) 0 1px, transparent 1px 6px);
 }
-.room.r5 {
+.room.r5::before {
   background-image:
     repeating-linear-gradient(45deg, var(--tex-light) 0 1px, transparent 1px 11px),
     repeating-linear-gradient(-45deg, var(--tex-light) 0 1px, transparent 1px 11px);

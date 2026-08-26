@@ -153,8 +153,11 @@ function currentWeek() {
 
 /* --------------------------------------------------------------- filters */
 
+// Courses are ANDed, not ORed: a student who picks 111 and 123 wants the hours
+// where one person can help with both, not the union of the two schedules.
+// Every other filter stays a union, because no shift has two rooms or two people.
 const matches = (shift) =>
-  (!filters.course.size || shift.courses.some((c) => filters.course.has(c))) &&
+  [...filters.course].every((c) => shift.courses.includes(c)) &&
   (!filters.role.size || filters.role.has(shift.person.role)) &&
   (!filters.building.size || filters.building.has(buildingOf(shift))) &&
   (!filters.person.size || filters.person.has(shift.person.key));
@@ -528,6 +531,8 @@ function renderGrid() {
   wrap.innerHTML = "";
   const grid = el("div", "grid");
   const height = model.slotCount * SLOT_H + GRID_PAD * 2;
+  // How tall a texture layer has to be to cover a whole column; see .room::before.
+  grid.style.setProperty("--col-h", `${height}px`);
 
   // A closed day still gets a column, just a narrow one — the week reads as a
   // week, and Saturday says "closed" instead of leaving a hole to interpret.
@@ -589,7 +594,16 @@ function renderGrid() {
         band.style.top = `${offset(fill.start)}px`;
         band.style.height = `${offset(fill.end) - offset(fill.start)}px`;
         // One stripe per room, so a half hour split across two rooms shows both.
-        for (const room of fill.rooms) band.append(el("div", `room r${paletteSlot(room) % 6}`));
+        // Each stripe also carries where it sits in the column, so its texture can
+        // be drawn from the column's corner and run on through the seams unbroken.
+        const bandTop = slotTop(block.startSlot) + offset(fill.start);
+        fill.rooms.forEach((room, i) => {
+          const stripe = el("div", `room r${paletteSlot(room) % 6}`);
+          stripe.style.setProperty("--tex-y", `${bandTop}px`);
+          stripe.style.setProperty("--tex-i", String(i));
+          stripe.style.setProperty("--tex-n", String(fill.rooms.length));
+          band.append(stripe);
+        });
         shape.append(band);
       }
 
