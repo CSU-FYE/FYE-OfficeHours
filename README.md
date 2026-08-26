@@ -33,6 +33,25 @@ GitHub Pages redeploys in about a minute. Then open **`<your-site-url>/?check=1`
 page lists anything in the workbook the site couldn't read. It's worth ten seconds after
 every update, because bad rows are hidden from students rather than shown as errors.
 
+### If a fresh Faculty & GTF grid arrives instead
+
+The department maintains those hours as a grid, not as this workbook. When a new copy
+lands, save it into `source-data/` as `FA26_Faculty_GTF Office Hours.xlsx` (replacing what's
+there) and run:
+
+```bash
+python3 tools/update_faculty_hours.py
+```
+
+It prints exactly which hours it added and removed, then rewrites only the rows of the
+people named on that grid — LA hours, tutoring, roles and notes are left alone. Add
+`--dry-run` to see the diff without touching anything. Then commit `data/office-hours.xlsx`
+and check `?check=1` as above.
+
+One thing to watch: this edits the copy in this folder, not the workbook on OneDrive. Upload
+the result back over the OneDrive copy afterwards, or the next download from OneDrive will
+put the old faculty hours back.
+
 ---
 
 ## How to fill in the workbook
@@ -171,6 +190,7 @@ After that, every `git push` republishes it.
 | `source-data/` | The two original grid workbooks, kept for reference. Nothing reads them. |
 | `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. **If you ever do, run `add_tutoring.py` straight after** — `make_workbook.py` predates tutoring and writes a workbook without it. |
 | `tools/add_tutoring.py` | Rebuilds the tutoring rows from the two tutoring grids in `source-data/`. Re-runnable, and it never touches an office-hours row. |
+| `tools/update_faculty_hours.py` | Folds a fresh Faculty & GTF grid into the workbook. Run it when a new copy of that grid arrives — see above. |
 | `MIGRATION-NOTES.md` | What that conversion had to guess. **Worth reading once.** |
 | `HANDOFF.md` | Orientation for a developer (or a new AI chat) picking this up cold. |
 

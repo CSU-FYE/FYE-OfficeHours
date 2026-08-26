@@ -33,6 +33,7 @@ all opt-in and mirror into the URL.
 | `assets/styles.css` | Everything visual. Light/dark. Room palette + textures. |
 | `tools/make_workbook.py` | **One-time** migration from the original grid schedules. Ben never runs it — and it predates tutoring, so `add_tutoring.py` must follow it if he ever does. |
 | `tools/add_tutoring.py` | Folds the two tutoring grids into the workbook **in place**, so the yellow role flags and every hand edit survive. Re-runnable; rebuilds only the tutoring rows. |
+| `tools/update_faculty_hours.py` | Same idea for the Faculty & GTF grid: run it when a fresh copy of that grid arrives. Prints the diff, rebuilds only the rows of people named on the grid, and never touches an LA or tutoring row. `--dry-run` shows the diff without writing. |
 | `tools/serve.py` | Local preview server. **Use this, not `python3 -m http.server`** — see Gotchas. |
 | `source-data/` | Original grid workbooks. **Gitignored** (see Privacy). |
 
@@ -172,7 +173,7 @@ which is the point of the site.
 
 ## Current state (25 Aug 2026)
 
-48 people (33 LA, 6 faculty, 5 GTF, 4 tutor-only), 138 shifts — 65 office hours, 73
+49 people (33 LA, 6 faculty, 6 GTF, 4 tutor-only), 141 shifts — 68 office hours, 73
 tutoring — 4 of them online with Teams links. Rooms in use: AV C144, AV C141, Online.
 25 courses across 7 subjects. The week runs Monday–Sunday; Saturday is the one closed
 column. `?check=1` reports zero errors and one warning, which is real (see below).
@@ -191,13 +192,16 @@ column. `?check=1` reports zero errors and one warning, which is real (see below
      shifts, so they are in the workbook as `tutor` and invisible to students. Harmless,
      but they are placeholders.
 
-1. **Ten roles still guessed.** `Chloe`, `Dr. Dan`, `Dr. Harvey`, `Dr. Yume`, `DrT`, `Ojo`,
-   `Prof Scheller`, `Sumaiya`, `Taylor`, `Winnie` — the source grids only ever gave a first
-   name or a title. Their `role` cells are highlighted yellow in the workbook with a comment
-   explaining why. Full names would also let students search by surname. Likely identities
+1. **Eleven roles still guessed.** `Chloe`, `Dr. Dan`, `Dr. Harvey`, `Dr. Yume`, `DrT`,
+   `Leila`, `Ojo`, `Prof Scheller`, `Sumaiya`, `Taylor`, `Winnie` — the source grids only
+   ever gave a first name or a title. Their `role` cells are highlighted yellow in the
+   workbook with a comment explaining why. Full names would also let students search by surname. Likely identities
    (unconfirmed, never merged automatically): `DrT`→Dr. Torres, `Chloe`→Chloe Brekhus,
    `Taylor`→Nell Taylor, `Prof Scheller`→Dylan Scheller *(who is flagged as a GTA in the
-   source, so this role may be wrong)*. See `MIGRATION-NOTES.md`.
+   source, so this role may be wrong)*. See `MIGRATION-NOTES.md` — which covers the first
+   ten only. `Leila` arrived later, on the 25 Aug grid, and is guessed as a GTF because
+   that is what an unrecognised name on that grid defaults to — the least-confirmed
+   guess of the eleven, and the one worth asking about first.
 2. **23 light-blue cells** (`#C0E6F5`) on the source `Professor & GTFs` sheet, with no key
    anywhere and no hyperlinks. Never acted on. Ask what they mean.
 3. **`Master Schedule`** in the source is hidden and its names mostly match nothing else —
