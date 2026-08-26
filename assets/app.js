@@ -8,7 +8,7 @@
 
 import {
   loadModel, availabilityAt, parseMappingRules, formatTime, formatRange,
-  DAYS, ROLE_LABELS, SLOT_MINUTES, dateKey,
+  DAYS, ROLE_LABELS, SLOT_MINUTES, dateKey, subjectOf,
 } from "./data.js";
 
 const WORKBOOK = "data/office-hours.xlsx";
@@ -34,6 +34,9 @@ let activeDay = 0;
 let selection = null;
 let roomIndex = new Map();
 let buildingRules = [];
+// Deliberately no `program`. Office hours and tutoring are one thing to a student
+// looking for help: the room says where to walk, the courses say whether it is the
+// right help, and which staffing programme pays for the hour is ours, not theirs.
 const filters = { course: new Set(), role: new Set(), building: new Set(), person: new Set() };
 
 /* ------------------------------------------------------------------ boot */
@@ -53,7 +56,9 @@ async function init() {
 async function start(buffer, lastModified) {
   model = await loadModel(buffer);
   week = currentWeek();
-  activeDay = Math.min(Math.max(new Date().getDay() - 1, 0), 4);
+  // Read off the week rather than recomputed from the clock, so the tab that opens
+  // and the column marked TODAY can never disagree.
+  activeDay = week.find((day) => day.isToday)?.index ?? 0;
 
   document.title = model.settings.term_name
     ? `Office Hours · ${model.settings.term_name}`
@@ -120,17 +125,29 @@ function offerFilePicker(error) {
 
 /* ------------------------------------------------------------------ week */
 
+/**
+ * The Monday-to-Sunday week containing today.
+ *
+ * The weekend used to roll forward to the next week, because neither day held
+ * anything. Sunday tutoring ended that: on a Saturday the very next thing that
+ * happens is tomorrow evening, so the week has to keep today inside it.
+ */
 function currentWeek() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  // Saturday and Sunday look ahead to the coming week rather than back at a spent one.
-  const offset = today.getDay() === 0 ? 1 : today.getDay() === 6 ? 2 : 1 - today.getDay();
   const monday = new Date(today);
-  monday.setDate(today.getDate() + offset);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   return DAYS.map((name, i) => {
     const date = new Date(monday);
     date.setDate(monday.getDate() + i);
-    return { name, index: i, date, iso: dateKey(date), isToday: dateKey(date) === dateKey(new Date()) };
+    return {
+      name, index: i, date,
+      iso: dateKey(date),
+      isToday: dateKey(date) === dateKey(new Date()),
+      // A day nothing is ever scheduled on. Read from the whole schedule rather
+      // than the filtered one, so picking a course cannot close a day.
+      closed: !model.openDays.has(i),
+    };
   });
 }
 
@@ -144,8 +161,14 @@ const matches = (shift) =>
 
 // Learning Assistants first: they are the largest group and the one a student
 // is most likely to be looking for by name.
-const PERSON_GROUPS = ["la", "gtf", "faculty"];
-const GROUP_LABELS = { la: "Learning Assistants", gtf: "GTFs", faculty: "Faculty" };
+const PERSON_GROUPS = ["la", "gtf", "faculty", "tutor"];
+const GROUP_LABELS = {
+  la: "Learning Assistants", gtf: "GTFs", faculty: "Faculty", tutor: "Tutors",
+};
+
+/** The heading a course sits under in the Get help with menu. */
+const subjectLabel = (course) =>
+  model.subjectNames.get(subjectOf(course)) || subjectOf(course);
 
 function filterDefinitions() {
   const has = (predicate) => model.shifts.some(predicate);
@@ -154,7 +177,9 @@ function filterDefinitions() {
   return [
     {
       key: "course", label: "Get help with",
-      options: model.courses.map((c) => ({ value: c, label: c })),
+      // Two dozen courses across seven subjects, so they are grouped the way the
+      // Person list is. Order comes from course_order on the settings sheet.
+      options: model.courses.map((c) => ({ value: c, label: c, group: subjectLabel(c) })),
     },
     {
       key: "role", label: "Role",
@@ -310,6 +335,7 @@ function renderAll() {
  * block however much the roster churns inside it.
  */
 function blocksFor(day) {
+  if (day.closed) return [];
   const rows = [];
   for (let i = 0; i < model.slotCount; i++) {
     const minute = model.dayStart + i * SLOT_MINUTES;
@@ -503,10 +529,15 @@ function renderGrid() {
   const grid = el("div", "grid");
   const height = model.slotCount * SLOT_H + GRID_PAD * 2;
 
+  // A closed day still gets a column, just a narrow one — the week reads as a
+  // week, and Saturday says "closed" instead of leaving a hole to interpret.
+  grid.style.gridTemplateColumns =
+    `var(--time-col) ${week.map((d) => (d.closed ? "var(--closed-col)" : "1fr")).join(" ")}`;
+
   grid.append(el("div", "head corner"));
   for (const day of week) {
-    const head = el("div", `head${day.isToday ? " today" : ""}`);
-    head.append(el("div", "dow", day.name));
+    const head = el("div", `head${day.isToday ? " today" : ""}${day.closed ? " closed" : ""}`);
+    head.append(el("div", "dow", day.closed ? day.name.slice(0, 3) : day.name));
     grid.append(head);
   }
 
@@ -527,8 +558,17 @@ function renderGrid() {
   grid.append(times);
 
   for (const day of week) {
-    const col = el("div", `col${day.isToday ? " today" : ""}`);
+    const col = el("div", `col${day.isToday ? " today" : ""}${day.closed ? " closed" : ""}`);
     col.style.height = `${height}px`;
+
+    if (day.closed) {
+      const shut = el("div", "shut");
+      shut.append(el("span", null, "Closed"));
+      shut.setAttribute("aria-label", `${day.name}: closed, no hours.`);
+      col.append(shut);
+      grid.append(col);
+      continue;
+    }
 
     for (let i = 0; i <= model.slotCount; i++) {
       const rule = el("div", `rule${(model.dayStart + i * SLOT_MINUTES) % 60 === 0 ? " hour" : ""}`);
@@ -599,6 +639,7 @@ function renderDayTabs() {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(day.index === activeDay));
+    if (day.closed) button.classList.add("closed");
     button.append(el("span", "dow", day.name.slice(0, 3)));
     button.addEventListener("click", () => {
       activeDay = day.index;
@@ -615,10 +656,12 @@ function renderDayList() {
 
   const day = week[activeDay];
   const list = el("div", "daylist");
-  const blocks = blocksFor(day);
+  const blocks = day.closed ? [] : blocksFor(day);
 
-  if (!blocks.length) {
-    list.append(el("p", "empty", "No office hours on this day with the filters you have chosen."));
+  if (day.closed) {
+    list.append(el("p", "empty", `Closed on ${day.name}. Nothing is scheduled.`));
+  } else if (!blocks.length) {
+    list.append(el("p", "empty", "Nothing on this day with the filters you have chosen."));
   }
   for (const block of blocks) {
     const head = el("div", "daygroup");
@@ -706,18 +749,24 @@ function renderNow() {
   } else {
     const next = nextOpening(minutes);
     box.append(el("p", "none", next
-      ? `No office hours right now. Next: ${next.dayName} at ${formatTime(next.start)}.`
-      : "No office hours right now."));
+      ? `Nothing open right now. Next: ${next.dayName} at ${formatTime(next.start)}.`
+      : "Nothing open right now."));
   }
 }
 
+/**
+ * The next block that opens, wrapping into the following week if the rest of
+ * this one is spent — which is what a Sunday night reader is looking at, now
+ * that Sunday is the last column rather than the first.
+ */
 function nextOpening(minutesNow) {
   const today = week.find((d) => d.isToday);
-  for (const day of week) {
-    if (today && day.index < today.index) continue;
+  const from = today ? today.index : 0;
+  for (let step = 0; step < week.length; step++) {
+    const day = week[(from + step) % week.length];
     for (const block of blocksFor(day)) {
-      const isLater = !today || day.index > today.index || block.start > minutesNow;
-      if (isLater) return { dayName: day.isToday ? "today" : day.name, start: block.start };
+      if (step === 0 && today && block.start <= minutesNow) continue;
+      return { dayName: step === 0 ? "today" : day.name, start: block.start };
     }
   }
   return null;
@@ -742,9 +791,10 @@ function openPanel(day, section) {
   const body = $("panel-body");
   body.innerHTML = "";
 
+  const order = ["faculty", "gtf", "la", "tutor"];
   const entries = [...section.entries].sort(
     (a, b) =>
-      ["faculty", "gtf", "la"].indexOf(a.person.role) - ["faculty", "gtf", "la"].indexOf(b.person.role) ||
+      order.indexOf(a.person.role) - order.indexOf(b.person.role) ||
       a.person.displayName.localeCompare(b.person.displayName)
   );
 
@@ -831,6 +881,13 @@ function renderReport() {
 
   report.append(el("p", null,
     `${model.people.size} people · ${model.shifts.length} shifts · ${model.exceptions.length} exceptions loaded.`));
+
+  for (const program of model.programs) {
+    const rows = model.shifts.filter((s) => s.program === program);
+    report.append(el("p", null,
+      `${rows.length} ${rows.length === 1 ? "shift" : "shifts"} on the ${program} programme, ` +
+      `in ${[...new Set(rows.map(roomOf))].join(", ")}.`));
+  }
 
   for (const { source, targets } of model.courseRules) {
     report.append(el("p", null,

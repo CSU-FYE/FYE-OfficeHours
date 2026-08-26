@@ -9,8 +9,12 @@
 
 import { readWorkbook, toRecords } from "./xlsx.js";
 
-export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-export const ROLE_LABELS = { faculty: "Faculty", gtf: "GTF", la: "Learning Assistant" };
+// The whole week, Monday first. Saturday earns a column even with nothing in it:
+// a gap where a day should be is a question, an explicit "closed" is an answer.
+export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+export const ROLE_LABELS = {
+  faculty: "Faculty", gtf: "GTF", la: "Learning Assistant", tutor: "Tutor",
+};
 export const SLOT_MINUTES = 30;
 
 const DEFAULTS = {
@@ -18,6 +22,10 @@ const DEFAULTS = {
   day_end: "9:00 PM",
   default_courses: "ENGR 111; ENGR 114",
   course_implies: "",
+  default_program: "office hours",
+  program_order: "",
+  course_order: "",
+  subjects: "",
   default_location_faculty: "AV C147",
   default_location_gtf: "AV C147",
   default_location_la: "AV C144",
@@ -41,6 +49,7 @@ const ROLE_ALIASES = {
   faculty: "faculty", professor: "faculty", prof: "faculty", instructor: "faculty",
   gtf: "gtf", gta: "gtf", ta: "gtf", "graduate ta": "gtf", "grad ta": "gtf",
   la: "la", "learning assistant": "la",
+  tutor: "tutor", "peer tutor": "tutor", tutoring: "tutor",
 };
 
 export function normalizeRole(v) {
@@ -161,8 +170,24 @@ export function expandCourses(courses, rules) {
 
 function normalizeDay(value) {
   const s = str(value).toLowerCase();
-  return DAYS.find((d) => d.toLowerCase().startsWith(s.slice(0, 3))) || null;
+  if (!s) return null;
+  // Matched on a prefix so "Mon" and "Monday" both work, but only when the prefix
+  // picks out one day — a bare "S" is Saturday or Sunday and must not be guessed at.
+  const hits = DAYS.filter((d) => d.toLowerCase().startsWith(s.slice(0, 3)));
+  return hits.length === 1 ? hits[0] : null;
 }
+
+/** A programme name as a settings key: "office hours" -> "office_hours". */
+export const programKey = (v) =>
+  str(v).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+/**
+ * The subject a course belongs to: the letters before its number, or the whole
+ * label when it has no number ("Precalculus"). `subjects` in settings turns that
+ * into something readable and sets the order the Get help with menu groups by.
+ */
+export const subjectOf = (course) => (/^[A-Za-z]+/.exec(str(course)) || [""])[0].toUpperCase()
+  || str(course).toUpperCase();
 
 /* ----------------------------------------------------------------- build  */
 
@@ -200,7 +225,12 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   const courseRules = parseMappingRules(settings.course_implies);
   const expand = (courses) => expandCourses(courses, courseRules);
   const defaultCourses = expand(parseCourses(settings.default_courses));
-  const defaultLocation = (role) => str(settings[`default_location_${role}`]);
+  const defaultProgram = str(settings.default_program) || DEFAULTS.default_program;
+  // A programme's room beats the role's: at tutoring everyone sits in the same
+  // room whether they are an LA the rest of the week or a tutor and nothing else.
+  const defaultLocation = (program, role) =>
+    str(settings[`default_location_${programKey(program)}`]) ||
+    str(settings[`default_location_${role}`]);
 
   if (!peopleRows.length) {
     problem("error", "people", null,
@@ -226,6 +256,16 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       continue;
     }
     const courses = expand(parseCourses(r.courses));
+    // Someone can be an ENGR Learning Assistant on Tuesday and tutor CHEM on
+    // Wednesday, so what they help with depends on which programme the shift
+    // belongs to, not on who they are. Any `courses_<programme>` column on the
+    // people sheet is picked up — adding a programme needs no code change.
+    const programCourses = {};
+    for (const [column, value] of Object.entries(r)) {
+      const match = /^courses_(.+)$/.exec(column);
+      if (!match || !str(value)) continue;
+      programCourses[programKey(match[1])] = expand(parseCourses(value));
+    }
     people.set(key, {
       key,
       name,
@@ -233,6 +273,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       role,
       courses: courses.length ? courses : defaultCourses,
       usesDefaultCourses: !courses.length,
+      programCourses,
       email: str(r.email),
       notes: str(r.notes),
       shifts: [],
@@ -285,6 +326,13 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
         `${rawName} ${day}: mode "${str(r.mode)}" is not recognized, treated as in-person.`);
     }
     const courses = expand(parseCourses(r.courses));
+    const program = str(r.program) || defaultProgram;
+    const key = programKey(program);
+    const programCourses = person.programCourses[key];
+    if (key !== programKey(defaultProgram) && !programCourses && !courses.length) {
+      problem("warning", "shifts", r.__row,
+        `${rawName} ${day}: this is a ${program} shift but their courses_${key} cell on the people sheet is blank, so it advertises their office-hours courses.`);
+    }
 
     shifts.push({
       id: `s${shifts.length}`,
@@ -294,8 +342,10 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       start: round(Math.max(start, dayStart)),
       end: round(Math.min(end, dayEnd)),
       mode,
-      location: str(r.location) || defaultLocation(person.role),
-      courses: courses.length ? courses : person.courses,
+      program,
+      programKey: key,
+      location: str(r.location) || defaultLocation(program, person.role),
+      courses: courses.length ? courses : programCourses || person.courses,
       notes: str(r.notes),
       row: r.__row,
     });
@@ -351,10 +401,6 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
     }
 
     const dayIndex = DAYS.indexOf(weekdayOf(date));
-    if (type === "added" && dayIndex < 0) {
-      problem("warning", "exceptions", r.__row,
-        `${rawName} ${date} falls on a weekend, which the grid does not show.`);
-    }
     if (type === "cancelled") {
       const matches = person.shifts.filter(
         (s) => s.dayIndex === dayIndex && (start === null || (s.start < end && start < s.end))
@@ -370,26 +416,57 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       start: start === null ? null : round(start),
       end: end === null ? null : round(end),
       mode: /^online$/i.test(str(r.mode)) ? "online" : "in-person",
-      location: str(r.location) || defaultLocation(person.role),
+      location: str(r.location) || defaultLocation(defaultProgram, person.role),
       note: str(r.note) || str(r.notes),
       row: r.__row,
     });
   }
 
-  const courses = [...new Set([...defaultCourses, ...shifts.flatMap((s) => s.courses)])].sort();
-  const roles = ["faculty", "gtf", "la"].filter((role) => shifts.some((s) => s.person.role === role));
+  const courses = order(
+    [...new Set([...defaultCourses, ...shifts.flatMap((s) => s.courses)])],
+    parseCourses(settings.course_order)
+  );
+  const roles = ["faculty", "gtf", "la", "tutor"].filter((role) =>
+    shifts.some((s) => s.person.role === role)
+  );
+  const programs = order(
+    [...new Set(shifts.map((s) => s.program))],
+    str(settings.program_order).split(";").map((v) => v.trim()).filter(Boolean),
+    programKey
+  );
+  // Which days the week is open at all — read from every shift, not the filtered
+  // ones, so choosing a course cannot make Friday collapse into a closed column.
+  const openDays = new Set(shifts.map((s) => s.dayIndex));
+  const subjectNames = new Map(
+    parseMappingRules(settings.subjects).map(({ source, targets }) => [
+      subjectOf(source), targets[0],
+    ])
+  );
 
   return {
     settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems, courseRules,
+    programs, defaultProgram, openDays, subjectNames,
     slotCount: Math.ceil((dayEnd - dayStart) / SLOT_MINUTES),
   };
 }
 
 const round = (m) => Math.round(m / SLOT_MINUTES) * SLOT_MINUTES;
 
+/**
+ * `values` sorted by a preferred list from the settings sheet, with anything the
+ * list does not name falling in alphabetically behind it. Same reasoning as
+ * `room_order`: a course or programme dropping out must not reshuffle the rest.
+ */
+function order(values, preferred, key = (v) => v) {
+  const rank = new Map(preferred.map((v, i) => [key(v), i]));
+  const at = (v) => rank.get(key(v)) ?? preferred.length;
+  return [...values].sort((a, b) => at(a) - at(b) || String(a).localeCompare(String(b)));
+}
+
+/** Monday is 0 here, where JavaScript makes it 1 and puts Sunday at the front. */
 function weekdayOf(isoDate) {
   const [y, m, d] = isoDate.split("-").map(Number);
-  return ["Sunday", ...DAYS, "Saturday"][new Date(y, m - 1, d).getDay()];
+  return DAYS[(new Date(y, m - 1, d).getDay() + 6) % 7];
 }
 
 /**

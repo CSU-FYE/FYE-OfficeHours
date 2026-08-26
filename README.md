@@ -1,8 +1,10 @@
 # Office Hours Display
 
-A static website that shows students when and where they can get help. The whole
-schedule lives in one Excel workbook — `data/office-hours.xlsx` — which the page reads
-directly in the browser. There is no database, no build step, and no server code.
+A static website that shows students when and where they can get help. It covers two
+things: **ENGR office hours** in AV C144, and **tutoring** in AV C141 — chemistry,
+physics, maths, computer science, civil engineering and biology. The whole schedule
+lives in one Excel workbook — `data/office-hours.xlsx` — which the page reads directly
+in the browser. There is no database, no build step, and no server code.
 
 The default view answers one question with no clicking: **when can I get help?** Each
 half-hour of the week is coloured by **which room** to walk to, and carries no text at
@@ -46,20 +48,22 @@ not a typo waiting to happen.
 |---|---|---|
 | `name` | yes | The exact name used on the `shifts` sheet. Must be unique. |
 | `display_name` | | What students see, if different (e.g. `Dr. Torres`). Blank = same as `name`. |
-| `role` | yes | `faculty`, `gtf`, or `la`. |
-| `courses` | | **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
+| `role` | yes | `faculty`, `gtf`, `la`, or `tutor`. Use `tutor` only for someone who tutors and is *not* also an ENGR LA — most tutors are both, and stay `la`. |
+| `courses` | | What they help with **at office hours**. **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
+| `courses_tutoring` | | What they help with **at tutoring**, separated by `;`. Blank means they do not tutor. This is the only place to edit it — every one of their tutoring shifts reads from this one cell. |
 | `email` | | Shown to students in the detail panel. |
 | `notes` | | Shown to students. Keep it short. |
 
-### `shifts` — one row per weekly office hour
+### `shifts` — one row per weekly hour
 
 | Column | Required | What goes in it |
 |---|---|---|
 | `name` | yes | Pick from the dropdown (it reads the `people` sheet). |
-| `day` | yes | Monday–Friday. |
+| `day` | yes | Monday–Sunday. A day with no rows shows as a narrow, crossed-out **Closed** column. |
 | `start`, `end` | yes | `9:00 AM`, `1:30 PM`. Must land on the hour or half hour. |
+| `program` | | `office hours` or `tutoring`. Blank = office hours. Decides both the room and which of the person's two course lists the shift advertises. **Students never see it** — no filter, no badge, no panel line; it shows on `?check=1` only. |
 | `mode` | | `in-person` or `online`. Blank = in-person. |
-| `location` | | Blank = the default room for their role. For online, put the meeting link here and it becomes a clickable link. |
+| `location` | | Blank = the default room for the programme (`default_location_tutoring`), falling back to the default for their role. For online, put the meeting link here and it becomes a clickable link. |
 | `courses` | | Overrides the person's courses **for this shift only**. Rarely needed. |
 | `active` | | `no` hides the row without deleting it. |
 | `notes` | | e.g. "first half hour is drop-in only". |
@@ -77,9 +81,15 @@ that week; added hours show up tagged "One-off".
 
 ### `settings` — term dates, default rooms, and the announcement banner
 
-Change `default_location_la` once and every LA's room updates. Put text in `announcement`
-to show a banner across the top of the site (e.g. "No office hours Nov 26–28"); clear it
-to remove the banner.
+Change `default_location_la` once and every LA's room updates; `default_location_tutoring`
+does the same for the whole tutoring programme. Put text in `announcement` to show a
+banner across the top of the site (e.g. "No office hours Nov 26–28"); clear it to remove
+the banner.
+
+Two settings shape the **Get help with** menu, which is now two dozen courses long:
+`subjects` groups them under headings (`CHEM -> Chemistry; …`) and `course_order` sets
+the order they are listed in. A course named in neither still appears — alphabetically,
+at the end, under its own bare subject code.
 
 ---
 
@@ -87,7 +97,8 @@ to remove the banner.
 
 On the `people` sheet, add a row with their name and role. That's it — their name is then
 available in the `shifts` dropdown. They cover ENGR 111 and ENGR 114 unless you say
-otherwise in `courses`.
+otherwise in `courses`. If they also tutor, fill in `courses_tutoring` and give their
+tutoring shifts `program` = `tutoring`.
 
 ## Adding a new course
 
@@ -158,14 +169,22 @@ After that, every `git push` republishes it.
 | `assets/app.js` | Draws the grid, the filters, and the detail panel. |
 | `data/office-hours.xlsx` | **The schedule.** The only file you normally touch. |
 | `source-data/` | The two original grid workbooks, kept for reference. Nothing reads them. |
-| `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. |
+| `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. **If you ever do, run `add_tutoring.py` straight after** — `make_workbook.py` predates tutoring and writes a workbook without it. |
+| `tools/add_tutoring.py` | Rebuilds the tutoring rows from the two tutoring grids in `source-data/`. Re-runnable, and it never touches an office-hours row. |
 | `MIGRATION-NOTES.md` | What that conversion had to guess. **Worth reading once.** |
 | `HANDOFF.md` | Orientation for a developer (or a new AI chat) picking this up cold. |
 
 ## Notes on how it behaves
 
-- The site shows **the current week**, with real dates in the column headers. On weekends
-  it shows the week ahead.
+- The site shows **the Monday-to-Sunday week containing today**. It used to roll the
+  weekend forward to the following week; Sunday tutoring ended that, because on a
+  Saturday the next thing that happens is tomorrow evening.
+- **On a phone the day tabs open on today**, whichever day that is — including
+  Saturday, where the list says the day is closed.
+- **A day with nothing on it all term keeps its column**, narrowed and crossed out and
+  labelled *Closed*. A gap where a day should be is a question; an explicit "closed" is
+  an answer. This is read from the whole schedule, never the filtered one, so choosing
+  a course cannot make Friday collapse.
 - Consecutive hours by the same person merge into one block, so a 4–6 PM shift reads as
   one block rather than two.
 - **Rooms colour themselves.** Type a new room into a `location` cell and it gets its own

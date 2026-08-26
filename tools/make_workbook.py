@@ -6,6 +6,12 @@ from the Fall 2026 source schedules. It is kept so the conversion is auditable a
 re-runnable if the originals are corrected.
 
     python3 tools/make_workbook.py
+    python3 tools/add_tutoring.py     # ALWAYS, straight after
+
+This script writes data/office-hours.xlsx from scratch, and it predates the AV C141
+tutoring programme: on its own it produces a workbook with no program column, no
+courses_tutoring column, and none of the tutoring rows. add_tutoring.py puts all of
+that back. Running this one alone silently drops half the schedule.
 
 Writes data/office-hours.xlsx and MIGRATION-NOTES.md.
 """
@@ -478,3 +484,5 @@ def write_notes(people, shifts):
 
 if __name__ == "__main__":
     main()
+    print("\nThis workbook has no tutoring in it yet. Run:\n"
+          "    python3 tools/add_tutoring.py")

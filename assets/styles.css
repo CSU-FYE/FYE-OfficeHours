@@ -64,6 +64,9 @@
   --radius: 10px;
   --slot-h: 26px;
   --time-col: 76px;
+  /* A day with nothing on it all term. Wide enough to name and cross out,
+     narrow enough that it costs the six working days almost nothing. */
+  --closed-col: 40px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -253,7 +256,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 
 .grid {
   display: grid;
-  grid-template-columns: var(--time-col) repeat(5, 1fr);
+  /* Overwritten inline per render: a closed day takes --closed-col instead
+     of a share of the width. This is the all-open fallback. */
+  grid-template-columns: var(--time-col) repeat(7, 1fr);
   background: var(--surface);
   border: 1px solid var(--line);
   /* No overflow clipping here: it would trap the sticky day headers inside the
@@ -290,6 +295,25 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .col { position: relative; border-right: 1px solid var(--line); }
 .col:last-child { border-right: 0; }
 .col.today { background: color-mix(in srgb, var(--csu-bar) 6%, transparent); }
+
+/* A closed day: hatched right through, and labelled, so it reads as an answer
+   rather than as a column that failed to load. The hatch is the same hairline
+   weight as the room textures, for the same colour-blindness reason. */
+.col.closed { background: var(--surface-2); }
+.head.closed { background: var(--surface-2); }
+.head.closed .dow { color: var(--ink-3); font-weight: 500; }
+.shut {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(
+    -45deg, transparent 0 5px, color-mix(in srgb, var(--ink-3) 42%, transparent) 5px 6px);
+}
+.shut span {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-2); background: var(--surface-2);
+  padding: 8px 3px; border-radius: 3px;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+}
 
 /* Half-hour rules; the hour lines are darker so the eye can count. */
 /* Half hours barely there, hours definite — the grid should be countable at a
@@ -383,6 +407,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .daytabs button .dow { display: block; font-weight: 600; font-size: 0.92rem; }
 .daytabs button { padding: 10px 4px; }
 .daytabs button[aria-selected="true"] { background: var(--csu-bar); border-color: var(--csu-bar); color: #fff; }
+.daytabs button.closed .dow { color: var(--ink-3); font-weight: 500; }
+.daytabs button.closed[aria-selected="true"] .dow { color: #fff; }
 
 .daylist { display: flex; flex-direction: column; gap: 6px; }
 .daylist .row {
@@ -445,10 +471,14 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2);
   border: 1px solid var(--line);
 }
-.badge.faculty { background: color-mix(in srgb, var(--green-500) 18%, var(--surface)); color: var(--green-700); border-color: color-mix(in srgb, var(--green-500) 35%, var(--line)); }
+/* Every role badge is the same neutral: faculty, GTF, LA and tutor all read as
+   one kind of label. Faculty used to be green, which put them a rank above the
+   rest of the panel — colour here is a hierarchy nobody asked to see. Colour in
+   this site means room, and only room.
+   `oneoff` is not a role. It marks an hour that departs from the normal week, so
+   it stays gold — a state worth catching, not a person worth ranking. */
 .badge.oneoff { background: color-mix(in srgb, var(--gold) 28%, var(--surface)); color: #7a5a15; border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
 @media (prefers-color-scheme: dark) {
-  .badge.faculty { color: var(--s3); }
   .badge.oneoff { color: var(--gold); }
 }
 .person-meta { margin: 6px 0 0; color: var(--ink-2); font-size: 0.89rem; display: flex; flex-direction: column; gap: 3px; }
