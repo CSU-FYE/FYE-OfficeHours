@@ -328,8 +328,10 @@ def main():
         if row is None:
             row = people.max_row + 1
             people.cell(row, col_name, name)
-            # Not ENGR Learning Assistants - the four who tutor and nothing else.
-            people.cell(row, col_role, "tutor")
+            # Someone off the tutoring grid who holds no ENGR office hours. They
+            # are still a Learning Assistant: the separate tutor role was folded
+            # into la, because to a student it named the same kind of help.
+            people.cell(row, col_role, "la")
             rows[name] = row
             added.append(name)
         people.cell(row, col_courses_tutoring, "; ".join(courses))
@@ -342,8 +344,8 @@ def main():
         if name not in tutors:
             people.cell(row, col_courses_tutoring, None)
 
-    dropdown(people, '"faculty,gtf,la,tutor"',
-             "Role must be faculty, gtf, la, or tutor.",
+    dropdown(people, '"faculty,gtf,la"',
+             "Role must be faculty, gtf, or la.",
              f"{get_column_letter(col_role)}2:{get_column_letter(col_role)}400")
 
     # -- shifts: which programme a row belongs to --------------------------
@@ -418,8 +420,9 @@ README = [
     ("people sheet - everyone who holds hours, listed once", True),
     ("  name          the exact name used on the shifts sheet. Must be unique.", False),
     ("  display_name  what students see, if different (e.g. Dr. Torres). Blank = same as name.", False),
-    ("  role          faculty, gtf, la, or tutor. Pick from the dropdown.", False),
-    ("                Use tutor only for someone who tutors and is not also an LA.", False),
+    ("  role          faculty, gtf, or la. Pick from the dropdown.", False),
+    ("                Everyone who tutors is an la, whether or not they also hold", False),
+    ("                ENGR office hours.", False),
     ("  courses       what they help with at ENGR OFFICE HOURS.", False),
     ("                Leave BLANK for the default (ENGR 111 and ENGR 114).", False),
     ("                If you fill it in, list ALL courses they cover, separated by ;", False),

@@ -164,9 +164,9 @@ const matches = (shift) =>
 
 // Learning Assistants first: they are the largest group and the one a student
 // is most likely to be looking for by name.
-const PERSON_GROUPS = ["la", "gtf", "faculty", "tutor"];
+const PERSON_GROUPS = ["la", "gtf", "faculty"];
 const GROUP_LABELS = {
-  la: "Learning Assistants", gtf: "GTFs", faculty: "Faculty", tutor: "Tutors",
+  la: "Learning Assistants", gtf: "GTFs", faculty: "Faculty",
 };
 
 /** The heading a course sits under in the Get help with menu. */
@@ -805,7 +805,7 @@ function openPanel(day, section) {
   const body = $("panel-body");
   body.innerHTML = "";
 
-  const order = ["faculty", "gtf", "la", "tutor"];
+  const order = ["faculty", "gtf", "la"];
   const entries = [...section.entries].sort(
     (a, b) =>
       order.indexOf(a.person.role) - order.indexOf(b.person.role) ||

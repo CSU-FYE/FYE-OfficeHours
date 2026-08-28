@@ -67,7 +67,7 @@ not a typo waiting to happen.
 |---|---|---|
 | `name` | yes | The exact name used on the `shifts` sheet. Must be unique. |
 | `display_name` | | What students see, if different (e.g. `Dr. Torres`). Blank = same as `name`. |
-| `role` | yes | `faculty`, `gtf`, `la`, or `tutor`. Use `tutor` only for someone who tutors and is *not* also an ENGR LA — most tutors are both, and stay `la`. |
+| `role` | yes | `faculty`, `gtf`, or `la`. Everyone who tutors is an `la`, whether or not they also hold ENGR office hours — there is no separate tutor role. |
 | `courses` | | What they help with **at office hours**. **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
 | `courses_tutoring` | | What they help with **at tutoring**, separated by `;`. Blank means they do not tutor. This is the only place to edit it — every one of their tutoring shifts reads from this one cell. |
 | `email` | | Shown to students in the detail panel. |

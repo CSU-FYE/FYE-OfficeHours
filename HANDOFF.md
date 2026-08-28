@@ -126,10 +126,11 @@ Each of these was asked for deliberately, usually after seeing the alternative.
     schedule, never the filtered one: a course filter that emptied Friday and collapsed
     its column would move every other column under the reader's cursor.
 11. **The programme split is a maintenance concept, never a student-facing one.** It has
-    to exist in the workbook, because someone can be a Learning Assistant in C144 on
-    Tuesday and a tutor in C141 on Wednesday, and the room and course list follow from
-    which. But a student looking for help does not care who staffs the hour: the room
-    says where to walk and the courses say whether it is the right help. There was a
+    to exist in the workbook, because the same Learning Assistant can be in C144 on
+    Tuesday and in C141 on Wednesday, and the room and course list follow from which.
+    The *role* never had to carry that split, which is why `tutor` was folded into `la`.
+    But a student looking for help does not care who staffs the hour: the room says
+    where to walk and the courses say whether it is the right help. There was a
     "Kind of help" filter and a panel line for a few hours; both were cut on sight. The
     split surfaces on `?check=1` and nowhere else.
 12. **The narrow view opens on today**, read off `week`'s own `isToday` rather than
@@ -173,7 +174,7 @@ which is the point of the site.
 
 ## Current state (25 Aug 2026)
 
-49 people (33 LA, 6 faculty, 6 GTF, 4 tutor-only), 141 shifts — 68 office hours, 73
+49 people (37 LA, 6 faculty, 6 GTF), 141 shifts — 68 office hours, 73
 tutoring — 4 of them online with Teams links. Rooms in use: AV C144, AV C141, Online.
 25 courses across 7 subjects. The week runs Monday–Sunday; Saturday is the one closed
 column. `?check=1` reports zero errors and one warning, which is real (see below).
@@ -189,8 +190,8 @@ column. `?check=1` reports zero errors and one warning, which is real (see below
      The site counts her once and `?check=1` warns. One of those two cells probably meant
      to be someone else.
    - **Tom Brown and Izobel M** are on the Classes Grid with no subjects ticked and no
-     shifts, so they are in the workbook as `tutor` and invisible to students. Harmless,
-     but they are placeholders.
+     shifts, so they are in the workbook as `la` with nothing to show and are invisible
+     to students. Harmless, but they are placeholders.
 
 1. **Eleven roles still guessed.** `Chloe`, `Dr. Dan`, `Dr. Harvey`, `Dr. Yume`, `DrT`,
    `Leila`, `Ojo`, `Prof Scheller`, `Sumaiya`, `Taylor`, `Winnie` — the source grids only

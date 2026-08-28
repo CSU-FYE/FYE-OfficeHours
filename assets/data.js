@@ -13,7 +13,7 @@ import { readWorkbook, toRecords } from "./xlsx.js";
 // a gap where a day should be is a question, an explicit "closed" is an answer.
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 export const ROLE_LABELS = {
-  faculty: "Faculty", gtf: "GTF", la: "Learning Assistant", tutor: "Tutor",
+  faculty: "Faculty", gtf: "GTF", la: "Learning Assistant",
 };
 export const SLOT_MINUTES = 30;
 
@@ -48,8 +48,12 @@ export const nameKey = (v) =>
 const ROLE_ALIASES = {
   faculty: "faculty", professor: "faculty", prof: "faculty", instructor: "faculty",
   gtf: "gtf", gta: "gtf", ta: "gtf", "graduate ta": "gtf", "grad ta": "gtf",
+  // Tutor folds into Learning Assistant. Most people who tutor are ENGR LAs
+  // anyway, and to a student the two words named the same kind of help, so the
+  // distinction only ever made the role filter longer. The old spellings stay
+  // here so a workbook that still says "tutor" keeps working.
   la: "la", "learning assistant": "la",
-  tutor: "tutor", "peer tutor": "tutor", tutoring: "tutor",
+  tutor: "la", "peer tutor": "la", tutoring: "la",
 };
 
 export function normalizeRole(v) {
@@ -227,7 +231,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   const defaultCourses = expand(parseCourses(settings.default_courses));
   const defaultProgram = str(settings.default_program) || DEFAULTS.default_program;
   // A programme's room beats the role's: at tutoring everyone sits in the same
-  // room whether they are an LA the rest of the week or a tutor and nothing else.
+  // room, whether or not they hold ENGR office hours the rest of the week.
   const defaultLocation = (program, role) =>
     str(settings[`default_location_${programKey(program)}`]) ||
     str(settings[`default_location_${role}`]);
@@ -426,7 +430,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
     [...new Set([...defaultCourses, ...shifts.flatMap((s) => s.courses)])],
     parseCourses(settings.course_order)
   );
-  const roles = ["faculty", "gtf", "la", "tutor"].filter((role) =>
+  const roles = ["faculty", "gtf", "la"].filter((role) =>
     shifts.some((s) => s.person.role === role)
   );
   const programs = order(

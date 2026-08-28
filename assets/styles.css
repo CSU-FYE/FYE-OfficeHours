@@ -490,8 +490,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2);
   border: 1px solid var(--line);
 }
-/* Every role badge is the same neutral: faculty, GTF, LA and tutor all read as
-   one kind of label. Faculty used to be green, which put them a rank above the
+/* Every role badge is the same neutral: faculty, GTF and LA all read as one
+   kind of label. Faculty used to be green, which put them a rank above the
    rest of the panel — colour here is a hierarchy nobody asked to see. Colour in
    this site means room, and only room.
    `oneoff` is not a role. It marks an hour that departs from the normal week, so
