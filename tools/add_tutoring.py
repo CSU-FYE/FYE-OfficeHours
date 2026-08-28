@@ -388,11 +388,16 @@ def main():
     set_setting(settings, "subjects",
                 "ENGR -> Engineering; MATH -> Math; Precalculus -> Math; CHEM -> Chemistry; "
                 "PH -> Physics; CIVE -> Civil Engineering; CS -> Computer Science; LIFE -> Biology")
-    # ENGR first - this is the ENGR site - then the grid's own subject order, but
-    # numerically within each subject: the grid happens to head CIVE 261 before
-    # CIVE 260, which in a menu just looks like a mistake.
+    # ENGR first - this is the ENGR site - then Math, the subject most students
+    # come looking for, then the grid's own subject order, but numerically
+    # within each subject: the grid happens to head CIVE 261 before CIVE 260,
+    # which in a menu just looks like a mistake. Precalculus carries no subject
+    # code, so it has to be named to travel with the MATH courses it shares a
+    # heading with on the site.
     ordered = ["ENGR 111", "ENGR 114", "ENGR 123"]
-    for subject in dict.fromkeys(subject_of(c) for c in course_order):
+    subjects = list(dict.fromkeys(subject_of(c) for c in course_order))
+    first = [s for s in ("PRECALCULUS", "MATH") if s in subjects]
+    for subject in first + [s for s in subjects if s not in first]:
         ordered += sorted((c for c in course_order
                            if subject_of(c) == subject and c not in ordered),
                           key=lambda c: c.split(" ")[-1])

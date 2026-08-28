@@ -196,12 +196,6 @@ function filterDefinitions() {
       options: model.roles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
     },
     {
-      key: "language", label: "Language",
-      // English is not an option: everyone here speaks it, so it would filter
-      // nothing out. This menu answers "can someone explain it to me in mine?"
-      options: model.languages.map((l) => ({ value: l, label: l })),
-    },
-    {
       key: "building", label: "Where",
       // Built from the buildings actually in use, so nothing is offered that
       // has no hours behind it.
@@ -217,6 +211,12 @@ function filterDefinitions() {
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((p) => ({ value: p.key, label: p.name, group: GROUP_LABELS[role] }))
       ),
+    },
+    {
+      key: "language", label: "Language",
+      // English is not an option: everyone here speaks it, so it would filter
+      // nothing out. This menu answers "can someone explain it to me in mine?"
+      options: model.languages.map((l) => ({ value: l, label: l })),
     },
   ].filter((f) => f.options.length > 1);
 }
