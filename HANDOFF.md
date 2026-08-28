@@ -2,8 +2,8 @@
 
 A static site showing students when and where they can get help — ENGR office hours in
 AV C144, and tutoring in AV C141 across chemistry, physics, maths, CS, CIVE and biology.
-Live at **<https://bengrier.github.io/FYE-OfficeHours/>**, source in
-`bengrier/FYE-OfficeHours`, working copy at
+Live at **<https://csu-fye.github.io/FYE-OfficeHours/>**, source in
+`CSU-FYE/FYE-OfficeHours`, working copy at
 `~/Desktop/CSU Work/AI App Creation/Office Hours Display`.
 
 Everything the site knows comes from one Excel workbook, `data/office-hours.xlsx`, which the

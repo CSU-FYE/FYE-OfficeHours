@@ -159,7 +159,7 @@ leaving the filters and the grid. Paste this into a Canvas page with the HTML ed
 `</>` button):
 
 ```html
-<p><iframe src="https://bengrier.github.io/FYE-OfficeHours/?embed=1"
+<p><iframe src="https://csu-fye.github.io/FYE-OfficeHours/?embed=1"
    title="ENGR 111/114/123 office hours" width="100%" height="900"
    style="border: 1px solid #ddd; border-radius: 8px;"></iframe></p>
 ```
@@ -175,7 +175,7 @@ Students on phones get the day-by-day list instead of the grid, same as the full
 
 Once, at setup: push this folder to a GitHub repository, then in the repo go to
 **Settings → Pages** and set **Source** to *Deploy from a branch*, branch `main`, folder
-`/ (root)`. The site appears at `https://<username>.github.io/<repo>/` a minute later.
+`/ (root)`. The site appears at `https://<owner>.github.io/<repo>/` a minute later.
 After that, every `git push` republishes it.
 
 ---
