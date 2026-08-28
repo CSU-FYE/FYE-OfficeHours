@@ -70,6 +70,7 @@ not a typo waiting to happen.
 | `role` | yes | `faculty`, `gtf`, or `la`. Everyone who tutors is an `la`, whether or not they also hold ENGR office hours — there is no separate tutor role. |
 | `courses` | | What they help with **at office hours**. **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
 | `courses_tutoring` | | What they help with **at tutoring**, separated by `;`. Blank means they do not tutor. This is the only place to edit it — every one of their tutoring shifts reads from this one cell. |
+| `languages` | | Languages **besides English** they can help in, separated by `;`. Blank for most people. Fills the *Language* filter and adds an *Also speaks* line to the panel. Rebuilt from the rota's bilingual list by `add_tutoring.py`, so edit it there if it comes from tutoring. |
 | `email` | | Shown to students in the detail panel. |
 | `notes` | | Shown to students. Keep it short. |
 
@@ -117,7 +118,8 @@ at the end, under its own bare subject code.
 On the `people` sheet, add a row with their name and role. That's it — their name is then
 available in the `shifts` dropdown. They cover ENGR 111 and ENGR 114 unless you say
 otherwise in `courses`. If they also tutor, fill in `courses_tutoring` and give their
-tutoring shifts `program` = `tutoring`.
+tutoring shifts `program` = `tutoring`. If they can help in a language besides English,
+put it in `languages`.
 
 ## Adding a new course
 
@@ -234,9 +236,15 @@ After that, every `git push` republishes it.
   Where covers it.
 - **Picking two courses narrows, it does not widen.** *Get help with* ANDs: choose ENGR 111
   and CHEM 111 and you get only the hours where one person covers both, which is the
-  question a student with two hard classes is actually asking. Role, Where, and Person
-  stay unions — a shift has one room and one person, so ANDing those would always empty
-  the grid.
+  question a student with two hard classes is actually asking. Role, Language, Where, and
+  Person stay unions — a shift has one room and one person, and a student needs one of
+  their languages, not all of them, so ANDing those would always empty the grid.
+- **Language filters on the person, not the hour.** It is built from the `languages`
+  column, and English is never an option: everyone here speaks it, so offering it would
+  filter nothing out. The menu answers a narrower question — *can someone explain this to
+  me in mine?* It applies at office hours as much as at tutoring, because someone who can
+  explain a derivative in Spanish can do it in either room, even though the rota only
+  records it beside the tutoring roster.
 - **Online hours are a "room"** as far as colour goes: they get their own swatch and legend
   entry. Put the meeting URL in the `location` cell and the panel turns it into a
   *join the meeting* link.

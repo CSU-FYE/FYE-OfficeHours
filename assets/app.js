@@ -37,7 +37,9 @@ let buildingRules = [];
 // Deliberately no `program`. Office hours and tutoring are one thing to a student
 // looking for help: the room says where to walk, the courses say whether it is the
 // right help, and which staffing programme pays for the hour is ours, not theirs.
-const filters = { course: new Set(), role: new Set(), building: new Set(), person: new Set() };
+const filters = {
+  course: new Set(), role: new Set(), language: new Set(), building: new Set(), person: new Set(),
+};
 
 /* ------------------------------------------------------------------ boot */
 
@@ -159,6 +161,10 @@ function currentWeek() {
 const matches = (shift) =>
   [...filters.course].every((c) => shift.courses.includes(c)) &&
   (!filters.role.size || filters.role.has(shift.person.role)) &&
+  // A union like the rest: picking Spanish and Bengali asks for either, because
+  // a student needs one of them, not both at once.
+  (!filters.language.size ||
+    shift.person.languages.some((l) => filters.language.has(l))) &&
   (!filters.building.size || filters.building.has(buildingOf(shift))) &&
   (!filters.person.size || filters.person.has(shift.person.key));
 
@@ -187,6 +193,12 @@ function filterDefinitions() {
     {
       key: "role", label: "Role",
       options: model.roles.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
+    },
+    {
+      key: "language", label: "Language",
+      // English is not an option: everyone here speaks it, so it would filter
+      // nothing out. This menu answers "can someone explain it to me in mine?"
+      options: model.languages.map((l) => ({ value: l, label: l })),
     },
     {
       key: "building", label: "Where",
@@ -839,6 +851,9 @@ function openPanel(day, section) {
     }
     meta.append(el("div", null, `Here ${formatRange(start, end)}`));
     meta.append(el("div", null, `Helps with ${shift.courses.join(", ")}`));
+    if (person.languages.length) {
+      meta.append(el("div", null, `Also speaks ${person.languages.join(", ")}`));
+    }
     if (person.email) {
       const line = el("div");
       const link = el("a", null, person.email);

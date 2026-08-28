@@ -133,6 +133,20 @@ export function parseCourses(value) {
 }
 
 /**
+ * "spanish; Bengali" -> ["Spanish", "Bengali"].
+ *
+ * Title-cased so one spelling wins the filter: whoever types "spanish" in one row
+ * and "Spanish" in the next gets one option, not two. These are the languages a
+ * person can help in *besides* English, which is why the list is usually empty.
+ */
+export function parseLanguages(value) {
+  return str(value)
+    .split(/[;,]/)
+    .map((l) => l.trim().replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase()))
+    .filter(Boolean);
+}
+
+/**
  * "A -> B; C -> D, E" — the little arrow syntax the settings sheet uses for
  * anything that maps one name onto others: courses that come free with another
  * course, rooms that share a building. Kept in the sheet rather than in code so
@@ -279,6 +293,10 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       usesDefaultCourses: !courses.length,
       programCourses,
       email: str(r.email),
+      // A property of the person, not of the shift: someone who can explain a
+      // derivative in Spanish can do it at office hours and at tutoring alike,
+      // even though the rota only records it beside the tutoring roster.
+      languages: parseLanguages(r.languages),
       notes: str(r.notes),
       shifts: [],
     });
@@ -433,6 +451,10 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   const roles = ["faculty", "gtf", "la"].filter((role) =>
     shifts.some((s) => s.person.role === role)
   );
+  // Alphabetical, and only languages with hours actually behind them — offering
+  // one that matches nothing is worse than not offering it. No `language_order`
+  // setting: unlike courses and rooms, no language here outranks another.
+  const languages = [...new Set(shifts.flatMap((s) => s.person.languages))].sort();
   const programs = order(
     [...new Set(shifts.map((s) => s.program))],
     str(settings.program_order).split(";").map((v) => v.trim()).filter(Boolean),
@@ -449,7 +471,7 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
 
   return {
     settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems, courseRules,
-    programs, defaultProgram, openDays, subjectNames,
+    programs, defaultProgram, openDays, subjectNames, languages,
     slotCount: Math.ceil((dayEnd - dayStart) / SLOT_MINUTES),
   };
 }

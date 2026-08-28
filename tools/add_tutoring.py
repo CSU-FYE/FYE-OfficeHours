@@ -312,8 +312,12 @@ def main():
     # -- people: a second course list, for what they tutor -----------------
     col_courses_tutoring = column_of(people, "courses_tutoring") or people.max_column + 1
     header_cell(people, col_courses_tutoring, "courses_tutoring", 44)
+    # The bilingual note gets a column of its own rather than a sentence in
+    # notes. Notes is prose nobody can filter on, and writing there clobbered
+    # whatever a human had put in the cell.
+    col_languages = column_of(people, "languages") or people.max_column + 1
+    header_cell(people, col_languages, "languages", 18)
     col_name, col_role = column_of(people, "name"), column_of(people, "role")
-    col_notes = column_of(people, "notes")
 
     rows = {s(people.cell(r, col_name).value): r
             for r in range(2, people.max_row + 1) if s(people.cell(r, col_name).value)}
@@ -335,9 +339,11 @@ def main():
             rows[name] = row
             added.append(name)
         people.cell(row, col_courses_tutoring, "; ".join(courses))
-        language = language_by_full.get(name)
-        if language:
-            people.cell(row, col_notes, f"Also tutors in {language}.")
+
+    # Languages are rebuilt from the rota every run, for everyone: someone taken
+    # off the bilingual list should stop being advertised as speaking it.
+    for name, row in rows.items():
+        people.cell(row, col_languages, language_by_full.get(name) or None)
 
     # Clear stale tutoring lists for anyone no longer on the grid.
     for name, row in rows.items():
@@ -431,6 +437,9 @@ README = [
     ("  courses_tutoring   what they can help with AT TUTORING. Separated by ;", False),
     ("                Blank means they do not tutor. This is the only place to edit it -", False),
     ("                every one of their tutoring shifts reads from this cell.", False),
+    ("  languages     languages BESIDES ENGLISH they can help in, separated by ;", False),
+    ("                Blank for most people. Becomes the Language filter and a", False),
+    ("                line in the panel. Rebuilt from the rota's bilingual list.", False),
     ("  email, notes  optional. Both are shown to students, so keep notes short and useful.", False),
     ("", False),
     ("  Yellow cells were guessed during the migration - please check them.", False),

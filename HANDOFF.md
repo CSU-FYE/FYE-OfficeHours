@@ -56,6 +56,12 @@ Four sheets, plus a "how to use this" tab written for collaborators.
 - **`settings`** — key/value. This is the control panel; prefer adding a setting over
   hardcoding.
 
+**Languages.** `people.languages` is a `;` list of languages *besides English*, rebuilt
+from the rota's bilingual note on every `add_tutoring.py` run — including blanking anyone
+dropped from it. It drives the Language filter and an *Also speaks* line in the panel.
+There is no `language_order` setting: unlike courses and rooms, no language here outranks
+another, so the menu is alphabetical.
+
 **Programmes.** `shifts.program` is blank (office hours) or `tutoring`. It decides two
 things that a person cannot: which room the shift defaults to
 (`default_location_<program>`, which beats `default_location_<role>`), and which of the
@@ -117,7 +123,8 @@ Each of these was asked for deliberately, usually after seeing the alternative.
 8. **Every filter option names something that really has hours behind it.** Where is derived
    from buildings in use, so it cannot offer an empty place. Filters with one option hide.
    *Get help with* ANDs across courses — two courses means hours covering both — while the
-   other three filters are unions, since a shift has only one room and one person.
+   other four filters are unions, since a shift has only one room and one person, and a
+   student needs one of someone's languages rather than all of them.
 9. **No dates anywhere** — the schedule repeats weekly. Exceptions still apply to the real
    current week, just undated on screen.
 10. **A day nothing ever happens on keeps its column**, narrowed to 40px, hatched, and
@@ -138,6 +145,13 @@ Each of these was asked for deliberately, usually after seeing the alternative.
     On a Saturday that means opening on a closed day saying so.
 13. **Bad rows are hidden from students, never shown as errors.** `?check=1` is where they
     surface, with the exact sheet and row number.
+14. **Language is a property of the person and applies everywhere**, not just at tutoring,
+    even though the rota only records it in a "Bilingual Tutors!" note beside the Sunday
+    roster. Someone who can explain a derivative in Spanish can do it in C144 on Tuesday
+    too. English is deliberately not an option: everyone has it, so it would filter
+    nothing. It used to live as an "Also tutors in Spanish." sentence in `people.notes`,
+    which nobody could filter on and which overwrote whatever a human had typed there;
+    `people.languages` replaced it.
 
 ---
 
