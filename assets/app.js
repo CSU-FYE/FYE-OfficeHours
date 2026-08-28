@@ -34,9 +34,10 @@ let activeDay = 0;
 let selection = null;
 let roomIndex = new Map();
 let buildingRules = [];
-// Deliberately no `program`. Office hours and tutoring are one thing to a student
-// looking for help: the room says where to walk, the courses say whether it is the
-// right help, and which staffing programme pays for the hour is ours, not theirs.
+// Office hours and tutoring are one thing to a student looking for help: the room
+// says where to walk and the courses say whether it is the right help. Which of the
+// two staffing programmes pays for an hour is ours to know, not theirs — so the
+// workbook records the room and nothing infers a programme from it.
 const filters = {
   course: new Set(), role: new Set(), language: new Set(), building: new Set(), person: new Set(),
 };
@@ -213,8 +214,8 @@ function filterDefinitions() {
       options: PERSON_GROUPS.flatMap((role) =>
         people
           .filter((p) => p.role === role)
-          .sort((a, b) => a.displayName.localeCompare(b.displayName))
-          .map((p) => ({ value: p.key, label: p.displayName, group: GROUP_LABELS[role] }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((p) => ({ value: p.key, label: p.name, group: GROUP_LABELS[role] }))
       ),
     },
   ].filter((f) => f.options.length > 1);
@@ -766,7 +767,7 @@ function renderNow() {
     const list = el("ul");
     for (const { person, shift, end } of entries) {
       const item = el("li");
-      item.append(el("b", null, person.displayName));
+      item.append(el("b", null, person.name));
       item.append(el("span", null, ` · ${shift.mode === "online" ? "Online" : shift.location}`));
       item.append(el("span", null, ` · until ${formatTime(end)}`));
       list.append(item);
@@ -821,13 +822,13 @@ function openPanel(day, section) {
   const entries = [...section.entries].sort(
     (a, b) =>
       order.indexOf(a.person.role) - order.indexOf(b.person.role) ||
-      a.person.displayName.localeCompare(b.person.displayName)
+      a.person.name.localeCompare(b.person.name)
   );
 
   for (const { person, shift, start, end } of entries) {
     const card = el("div", "person");
     const top = el("div", "person-top");
-    top.append(el("span", "person-name", person.displayName));
+    top.append(el("span", "person-name", person.name));
     top.append(el("span", `badge ${person.role}`, ROLE_LABELS[person.role]));
     if (shift.oneOff) top.append(el("span", "badge oneoff", "One-off"));
     card.append(top);
@@ -854,15 +855,9 @@ function openPanel(day, section) {
     if (person.languages.length) {
       meta.append(el("div", null, `Also speaks ${person.languages.join(", ")}`));
     }
-    if (person.email) {
-      const line = el("div");
-      const link = el("a", null, person.email);
-      link.href = `mailto:${person.email}`;
-      line.append(link);
-      meta.append(line);
-    }
+    // Only a one-off carries a note now: the shifts sheet's own notes column was
+    // empty on all 141 rows and went with the rest of the unused ones.
     if (shift.notes) meta.append(el("div", null, shift.notes));
-    if (person.notes) meta.append(el("div", null, person.notes));
     card.append(meta);
     body.append(card);
   }
@@ -911,11 +906,11 @@ function renderReport() {
   report.append(el("p", null,
     `${model.people.size} people · ${model.shifts.length} shifts · ${model.exceptions.length} exceptions loaded.`));
 
-  for (const program of model.programs) {
-    const rows = model.shifts.filter((s) => s.program === program);
+  for (const room of orderedRooms()) {
+    const rows = model.shifts.filter((s) => roomOf(s) === room);
     report.append(el("p", null,
-      `${rows.length} ${rows.length === 1 ? "shift" : "shifts"} on the ${program} programme, ` +
-      `in ${[...new Set(rows.map(roomOf))].join(", ")}.`));
+      `${rows.length} ${rows.length === 1 ? "shift" : "shifts"} in ${room}, ` +
+      `advertising ${[...new Set(rows.flatMap((s) => s.courses))].join(", ") || "nothing"}.`));
   }
 
   for (const { source, targets } of model.courseRules) {

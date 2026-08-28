@@ -61,18 +61,19 @@ Never put two names in one cell — that's what made the old grid schedules impo
 filter. The workbook has dropdowns on the columns that matter, so most cells are a pick,
 not a typo waiting to happen.
 
+Nine columns in the two main sheets held nothing at all, so they are gone; what is left
+is only what somebody actually fills in. Both sheets have a **filter row** on the
+headings — narrow the sheet to one name, one day or one room while you work, without
+changing anything students see.
+
 ### `people` — everyone who holds office hours, listed once
 
 | Column | Required | What goes in it |
 |---|---|---|
-| `name` | yes | The exact name used on the `shifts` sheet. Must be unique. |
-| `display_name` | | What students see, if different (e.g. `Dr. Torres`). Blank = same as `name`. |
+| `name` | yes | The exact name used on the `shifts` sheet, and what students see — so write it the way they should read it (`Dr. Torres`, not `dtorres`). Must be unique. |
 | `role` | yes | `faculty`, `gtf`, or `la`. Everyone who tutors is an `la`, whether or not they also hold ENGR office hours — there is no separate tutor role. |
-| `courses` | | What they help with **at office hours**. **Blank means the default** (ENGR 111 and ENGR 114). If you fill it in, list *all* courses they cover, separated by `;`. Anyone covering ENGR 111 is counted for ENGR 123 automatically — see `course_implies`. |
-| `courses_tutoring` | | What they help with **at tutoring**, separated by `;`. Blank means they do not tutor. This is the only place to edit it — every one of their tutoring shifts reads from this one cell. |
+| `courses` | | What they can help with **in the tutoring room**, separated by `;`. Blank means they do not tutor. This is the only place to edit it — every one of their AV C141 shifts reads from this one cell. ENGR office hours in AV C144 advertises `default_courses` whatever is written here. |
 | `languages` | | Languages **besides English** they can help in, separated by `;`. Blank for most people. Fills the *Language* filter and adds an *Also speaks* line to the panel. Rebuilt from the rota's bilingual list by `add_tutoring.py`, so edit it there if it comes from tutoring. |
-| `email` | | Shown to students in the detail panel. |
-| `notes` | | Shown to students. Keep it short. |
 
 ### `shifts` — one row per weekly hour
 
@@ -81,12 +82,12 @@ not a typo waiting to happen.
 | `name` | yes | Pick from the dropdown (it reads the `people` sheet). |
 | `day` | yes | Monday–Sunday. A day with no rows shows as a narrow, crossed-out **Closed** column. |
 | `start`, `end` | yes | `9:00 AM`, `1:30 PM`. Must land on the hour or half hour. |
-| `program` | | `office hours` or `tutoring`. Blank = office hours. Decides both the room and which of the person's two course lists the shift advertises. **Students never see it** — no filter, no badge, no panel line; it shows on `?check=1` only. |
-| `mode` | | `in-person` or `online`. Blank = in-person. |
-| `location` | | Blank = the default room for the programme (`default_location_tutoring`), falling back to the default for their role. For online, put the meeting link here and it becomes a clickable link. |
-| `courses` | | Overrides the person's courses **for this shift only**. Rarely needed. |
-| `active` | | `no` hides the row without deleting it. |
-| `notes` | | e.g. "first half hour is drop-in only". |
+| `location` | yes | Where the hour happens. `AV C144` for ENGR office hours and `AV C141` for tutoring are on the dropdown; anywhere else, just type it and the site gives it its own colour. Paste a meeting link instead and the hour shows as **Online**, with the link in the panel. Blank falls back to `default_location` and raises a warning on `?check=1`. |
+
+`location` carries what a separate `program` column used to imply. A shift in
+`tutoring_room` advertises that person's `courses`; every other room advertises
+`default_courses`. One column, nothing to keep in step, and no blank cell that quietly
+means something.
 
 ### `exceptions` — one-off changes to the normal week
 
@@ -101,10 +102,11 @@ that week; added hours show up tagged "One-off".
 
 ### `settings` — term dates, default rooms, and the announcement banner
 
-Change `default_location_la` once and every LA's room updates; `default_location_tutoring`
-does the same for the whole tutoring programme. Put text in `announcement` to show a
-banner across the top of the site (e.g. "No office hours Nov 26–28"); clear it to remove
-the banner.
+`tutoring_room` is the room whose hours run on the `people` sheet's course lists — change
+it once and the whole tutoring programme moves. `default_location` is only the fallback
+for a `location` cell somebody left blank. `default_courses` is what an ENGR office hours
+shift advertises. Put text in `announcement` to show a banner across the top of the site
+(e.g. "No office hours Nov 26–28"); clear it to remove the banner.
 
 Two settings shape the **Get help with** menu, which is now two dozen courses long:
 `subjects` groups them under headings (`CHEM -> Chemistry; …`) and `course_order` sets
@@ -116,10 +118,10 @@ at the end, under its own bare subject code.
 ## Adding a new person
 
 On the `people` sheet, add a row with their name and role. That's it — their name is then
-available in the `shifts` dropdown. They cover ENGR 111 and ENGR 114 unless you say
-otherwise in `courses`. If they also tutor, fill in `courses_tutoring` and give their
-tutoring shifts `program` = `tutoring`. If they can help in a language besides English,
-put it in `languages`.
+available in the `shifts` dropdown. Their ENGR office hours cover ENGR 111 and ENGR 114.
+If they also tutor, list what they can help with in `courses` and put `AV C141` in the
+`location` of their tutoring shifts. If they can help in a language besides English, put
+it in `languages`.
 
 ## Adding a new course
 
@@ -190,8 +192,9 @@ After that, every `git push` republishes it.
 | `assets/app.js` | Draws the grid, the filters, and the detail panel. |
 | `data/office-hours.xlsx` | **The schedule.** The only file you normally touch. |
 | `source-data/` | The two original grid workbooks, kept for reference. Nothing reads them. |
-| `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. **If you ever do, run `add_tutoring.py` straight after** — `make_workbook.py` predates tutoring and writes a workbook without it. |
-| `tools/add_tutoring.py` | Rebuilds the tutoring rows from the two tutoring grids in `source-data/`. Re-runnable, and it never touches an office-hours row. |
+| `tools/make_workbook.py` | One-time script that converted those originals into the workbook. You don't need to run it. **If you ever do, run `simplify_workbook.py` then `add_tutoring.py` straight after** — it predates both the column cleanup and tutoring, and writes a workbook without either. |
+| `tools/simplify_workbook.py` | Where the workbook's shape is written down: the columns, the instructions tab, and the sort. Run once to cut the old wide workbook down to it; the other two import it so the schema lives in one place. |
+| `tools/add_tutoring.py` | Rebuilds the AV C141 rows from the two tutoring grids in `source-data/`. Re-runnable, and it never touches a row in another room. |
 | `tools/update_faculty_hours.py` | Folds a fresh Faculty & GTF grid into the workbook. Run it when a new copy of that grid arrives — see above. |
 | `MIGRATION-NOTES.md` | What that conversion had to guess. **Worth reading once.** |
 | `HANDOFF.md` | Orientation for a developer (or a new AI chat) picking this up cold. |
@@ -247,8 +250,9 @@ After that, every `git push` republishes it.
   records it beside the tutoring roster.
 - **Online hours are a "room"** as far as colour goes: they get their own swatch and legend
   entry. Put the meeting URL in the `location` cell and the panel turns it into a
-  *join the meeting* link.
+  *join the meeting* link. There is no separate `mode` column to set: a location that
+  starts like a link **is** the online marker, so the two can never disagree.
 - Filter choices are stored in the URL, so a filtered view can be linked to directly:
-  `.../#course=ENGR+114&mode=online` links straight to online ENGR 114 help.
+  `.../#course=ENGR+114&building=Online` links straight to online ENGR 114 help.
 - Rows the site can't read are hidden from students, never shown as errors. `?check=1` is
   where you find them.

@@ -31,8 +31,9 @@ all opt-in and mirror into the URL.
 | `assets/data.js` | Workbook → model. All the forgiving parsing lives here (times, days, roles, dates, courses). Anything unparseable becomes a *problem*, never an exception. |
 | `assets/app.js` | Grid, filters, detail panel, "right now" strip, check report. |
 | `assets/styles.css` | Everything visual. Light/dark. Room palette + textures. |
-| `tools/make_workbook.py` | **One-time** migration from the original grid schedules. Ben never runs it — and it predates tutoring, so `add_tutoring.py` must follow it if he ever does. |
-| `tools/add_tutoring.py` | Folds the two tutoring grids into the workbook **in place**, so the yellow role flags and every hand edit survive. Re-runnable; rebuilds only the tutoring rows. |
+| `tools/make_workbook.py` | **One-time** migration from the original grid schedules. Ben never runs it — and it predates both the column cleanup and tutoring, so `simplify_workbook.py` then `add_tutoring.py` must follow it if he ever does. |
+| `tools/simplify_workbook.py` | Where the workbook's shape lives: column specs, the instructions tab, `sort_shifts`. Run once to migrate; imported by the other two so the schema is written down once. |
+| `tools/add_tutoring.py` | Folds the two tutoring grids into the workbook **in place**, so the yellow role flags and every hand edit survive. Re-runnable; rebuilds only the AV C141 rows. |
 | `tools/update_faculty_hours.py` | Same idea for the Faculty & GTF grid: run it when a fresh copy of that grid arrives. Prints the diff, rebuilds only the rows of people named on the grid, and never touches an LA or tutoring row. `--dry-run` shows the diff without writing. |
 | `tools/serve.py` | Local preview server. **Use this, not `python3 -m http.server`** — see Gotchas. |
 | `source-data/` | Original grid workbooks. **Gitignored** (see Privacy). |
@@ -46,12 +47,13 @@ touches the DOM; `app.js` never parses spreadsheet values.
 
 Four sheets, plus a "how to use this" tab written for collaborators.
 
-- **`people`** — `name` (the key), `display_name`, `role` (`faculty`/`gtf`/`la`), `courses`,
-  `email`, `notes`. Blank `courses` means the default.
-- **`shifts`** — one row per weekly shift: `name`, `day`, `start`, `end`, `mode`,
-  `location`, `courses`, `active`, `notes`, `program`. **Three shifts = three rows.** Never
-  two names in a cell — that is the whole reason the old format had to go.
-- **`exceptions`** — `name`, `date`, `start`/`end`, `type` (`cancelled`/`added`), `mode`,
+- **`people`** — `name` (the key, and what students see), `role` (`faculty`/`gtf`/`la`),
+  `courses` (what they help with in `tutoring_room`; blank = they do not tutor),
+  `languages`.
+- **`shifts`** — one row per weekly shift: `name`, `day`, `start`, `end`, `location`.
+  **Three shifts = three rows.** Never two names in a cell — that is the whole reason the
+  old format had to go.
+- **`exceptions`** — `name`, `date`, `start`/`end`, `type` (`cancelled`/`added`),
   `location`, `note`. Blank times on a cancellation kills that person's whole day.
 - **`settings`** — key/value. This is the control panel; prefer adding a setting over
   hardcoding.
@@ -62,22 +64,27 @@ dropped from it. It drives the Language filter and an *Also speaks* line in the 
 There is no `language_order` setting: unlike courses and rooms, no language here outranks
 another, so the menu is alphabetical.
 
-**Programmes.** `shifts.program` is blank (office hours) or `tutoring`. It decides two
-things that a person cannot: which room the shift defaults to
-(`default_location_<program>`, which beats `default_location_<role>`), and which of the
-person's course lists it advertises (`people.courses_<program>`, falling back to
-`people.courses`). This exists because 26 of the 30 tutors are *also* ENGR Learning
-Assistants — the same person, in a different room, helping with different courses. Role
-stays what they are; the programme says which hat this row is. Nothing about it is
-hardcoded to tutoring: any `courses_<name>` column on `people` is picked up.
+**The two programmes, and why there is no `program` column.** 25 of the tutors are *also*
+ENGR Learning Assistants — the same person, in a different room, helping with different
+courses — so which hat a row is cannot be read off the person. It used to be a `program`
+column, blank for office hours and `tutoring` otherwise, from which the site inferred
+both the room and the course list.
+
+`location` now carries it outright. A shift in `tutoring_room` (`AV C141`) advertises that
+person's `courses`; every other room advertises `default_courses`. Same behaviour, one
+column instead of three, nothing inferred from a blank cell, and the sheet says where to
+walk in the cell a human would look for it. `mode` went the same way: a location that
+starts like a link **is** online, so a row can no longer be marked online while sitting in
+a classroom.
 
 Current settings worth knowing:
 
 ```
-default_location_faculty|gtf|la   AV C144        every in-person office hour
-default_location_tutoring         AV C141        the whole tutoring programme
-default_program                   office hours   what a blank program cell means
-program_order                     office hours; tutoring
+tutoring_room     AV C141    hours here run on people.courses; everywhere else
+                             advertises default_courses
+default_location  AV C144    only reached by a location cell left blank, which
+                             also raises a ?check=1 warning
+default_courses   ENGR 111; ENGR 114
 room_order        AV C144; AV C141; Scott Engineering; Online
 course_implies    ENGR 111 -> ENGR 123
 buildings         AV -> Academic Village
@@ -89,10 +96,12 @@ day_start/day_end 9:00 AM / 9:00 PM
 `course_implies` and `buildings` share one arrow syntax parsed by
 `parseMappingRules` in `data.js`: `A -> B, C; D -> E`.
 
-**No shift row carries an explicit room, and no tutoring row carries explicit courses.**
-They are all blank and resolve through `default_location_*` and `courses_tutoring`, so a
-room change or a tutor's new subject is a one-cell edit. The `(AV 147)` text still
-littering the *source* grids is stale — ignore it.
+**Every shift row carries its room; no row carries explicit courses.** A tutor's new
+subject is still a one-cell edit on `people`, and moving the whole tutoring programme is
+a one-cell edit on `settings.tutoring_room` — but where an individual hour happens is
+written down rather than inferred, because that is the thing a human editing the sheet
+most wants to see. The `(AV 147)` text still littering the *source* grids is stale —
+`update_faculty_hours.py` reads it, reports it and drops it.
 
 ---
 
@@ -132,14 +141,15 @@ Each of these was asked for deliberately, usually after seeing the alternative.
     day should be is a question; "closed" is an answer. It is computed from the *whole*
     schedule, never the filtered one: a course filter that emptied Friday and collapsed
     its column would move every other column under the reader's cursor.
-11. **The programme split is a maintenance concept, never a student-facing one.** It has
-    to exist in the workbook, because the same Learning Assistant can be in C144 on
-    Tuesday and in C141 on Wednesday, and the room and course list follow from which.
-    The *role* never had to carry that split, which is why `tutor` was folded into `la`.
-    But a student looking for help does not care who staffs the hour: the room says
-    where to walk and the courses say whether it is the right help. There was a
-    "Kind of help" filter and a panel line for a few hours; both were cut on sight. The
-    split surfaces on `?check=1` and nowhere else.
+11. **The programme split is a maintenance concept, never a student-facing one**, and it
+    is now spelled as a room. The same Learning Assistant can be in C144 on Tuesday and
+    in C141 on Wednesday, and the course list follows from which — but a student looking
+    for help does not care who staffs the hour: the room says where to walk and the
+    courses say whether it is the right help. There was a "Kind of help" filter and a
+    panel line for a few hours; both were cut on sight. Writing the room in the sheet
+    rather than a programme it implies means the maintenance concept and the
+    student-facing one are the same cell, so they cannot drift apart. The *role* never
+    had to carry the split either, which is why `tutor` was folded into `la`.
 12. **The narrow view opens on today**, read off `week`'s own `isToday` rather than
     recomputed from the clock, so the tab and the column marked TODAY cannot disagree.
     On a Saturday that means opening on a closed day saying so.

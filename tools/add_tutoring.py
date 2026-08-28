@@ -11,8 +11,10 @@ Neither is a shape the site can read, and neither is the shape Ben maintains. Th
 script edits the published workbook *in place* rather than regenerating it, so the
 yellow role flags, the comments and every hand edit made since the migration survive.
 
-It is re-runnable: tutoring rows and tutoring course lists are rebuilt from scratch
-each time, office-hours rows are never touched.
+It is re-runnable: the AV C141 rows and the course lists behind them are rebuilt
+from scratch each time, and rows in any other room are never touched. Which room
+a shift is in is the whole of what marks it as tutoring - there is no separate
+programme column to keep in step.
 
     python3 tools/add_tutoring.py
 
@@ -29,13 +31,14 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from simplify_workbook import OFFICE_ROOM, sort_shifts, write_instructions
+
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "source-data"
 BOOK = ROOT / "data" / "office-hours.xlsx"
 GRID = SOURCE / "Fall 2026 Classes and Tutors Grid.xlsx"
 ROTA = SOURCE / "Fall 2026 Semifinal Schedule.xlsx"
 
-PROGRAM = "tutoring"
 ROOM = "AV C141"
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -307,11 +310,11 @@ def main():
         sys.exit(1)
 
     wb = openpyxl.load_workbook(BOOK)
-    people, shifts, settings, readme = wb["people"], wb["shifts"], wb["settings"], wb["how to use this"]
+    people, shifts, settings = wb["people"], wb["shifts"], wb["settings"]
 
-    # -- people: a second course list, for what they tutor -----------------
-    col_courses_tutoring = column_of(people, "courses_tutoring") or people.max_column + 1
-    header_cell(people, col_courses_tutoring, "courses_tutoring", 44)
+    # -- people: what each of them can help with in AV C141 ----------------
+    col_courses = column_of(people, "courses") or people.max_column + 1
+    header_cell(people, col_courses, "courses", 52)
     # The bilingual note gets a column of its own rather than a sentence in
     # notes. Notes is prose nobody can filter on, and writing there clobbered
     # whatever a human had put in the cell.
@@ -338,7 +341,7 @@ def main():
             people.cell(row, col_role, "la")
             rows[name] = row
             added.append(name)
-        people.cell(row, col_courses_tutoring, "; ".join(courses))
+        people.cell(row, col_courses, "; ".join(courses))
 
     # Languages are rebuilt from the rota every run, for everyone: someone taken
     # off the bilingual list should stop being advertised as speaking it.
@@ -348,46 +351,40 @@ def main():
     # Clear stale tutoring lists for anyone no longer on the grid.
     for name, row in rows.items():
         if name not in tutors:
-            people.cell(row, col_courses_tutoring, None)
+            people.cell(row, col_courses, None)
 
     dropdown(people, '"faculty,gtf,la"',
              "Role must be faculty, gtf, or la.",
              f"{get_column_letter(col_role)}2:{get_column_letter(col_role)}400")
 
-    # -- shifts: which programme a row belongs to --------------------------
-    col_program = column_of(shifts, "program") or shifts.max_column + 1
-    header_cell(shifts, col_program, "program", 14)
+    # -- shifts: one row per hour on the rota ------------------------------
     col_shift_name = column_of(shifts, "name")
     col_day, col_start, col_end = column_of(shifts, "day"), column_of(shifts, "start"), column_of(shifts, "end")
+    col_location = column_of(shifts, "location")
 
-    # Drop the tutoring rows from any previous run, keep every office-hours row.
+    # Drop the AV C141 rows from any previous run. Every other room is somebody
+    # else's to maintain and is left exactly as it is.
     for row in range(shifts.max_row, 1, -1):
-        if s(shifts.cell(row, col_program).value).lower() == PROGRAM:
+        if s(shifts.cell(row, col_location).value).lower() == ROOM.lower():
             shifts.delete_rows(row)
 
     first_new = shifts.max_row + 1
-    for i, (name, day, start, end) in enumerate(sorted(
-            resolved, key=lambda x: (DAYS.index(x[1]), x[2].zfill(8), x[0]))):
+    for i, (name, day, start, end) in enumerate(resolved):
         row = first_new + i
         shifts.cell(row, col_shift_name, name)
         shifts.cell(row, col_day, day)
         shifts.cell(row, col_start, start).alignment = Alignment(horizontal="left")
         shifts.cell(row, col_end, end).alignment = Alignment(horizontal="left")
-        shifts.cell(row, col_program, PROGRAM)
-        # location and courses stay blank: the room comes from
-        # default_location_tutoring, the courses from courses_tutoring.
+        # The room is written out rather than implied. It is also what tells the
+        # site to advertise this person's `courses` instead of the ENGR default.
+        shifts.cell(row, col_location, ROOM)
 
-    letter = get_column_letter(col_program)
-    dropdown(shifts, f'"office hours,{PROGRAM}"',
-             "Use office hours or tutoring. Blank means office hours.",
-             f"{letter}2:{letter}400")
     dropdown(shifts, f'"{",".join(DAYS)}"', "Pick a day of the week.",
              f"{get_column_letter(col_day)}2:{get_column_letter(col_day)}400")
 
     # -- settings ----------------------------------------------------------
-    set_setting(settings, "default_program", "office hours")
-    set_setting(settings, "program_order", "office hours; tutoring")
-    set_setting(settings, f"default_location_{PROGRAM}", ROOM)
+    set_setting(settings, "tutoring_room", ROOM)
+    set_setting(settings, "default_location", OFFICE_ROOM)
     set_setting(settings, "subjects",
                 "ENGR -> Engineering; MATH -> Math; Precalculus -> Math; CHEM -> Chemistry; "
                 "PH -> Physics; CIVE -> Civil Engineering; CS -> Computer Science; LIFE -> Biology")
@@ -401,8 +398,9 @@ def main():
                           key=lambda c: c.split(" ")[-1])
     set_setting(settings, "course_order", "; ".join(ordered))
 
+    total = sort_shifts(shifts)
     # -- the tab that explains all this to whoever edits next --------------
-    rewrite_readme(readme)
+    write_instructions(wb)
 
     if tbd:
         note = "; ".join(f"{day} {start}" for day, start, _, _ in tbd)
@@ -410,79 +408,9 @@ def main():
               f"site until a name is filled in — {note}")
 
     wb.save(BOOK)
-    print(f"{len(tutors)} tutors, {len(resolved)} tutoring shifts written to {BOOK.relative_to(ROOT)}")
+    print(f"{len(tutors)} tutors, {len(resolved)} {ROOM} shifts written to "
+          f"{BOOK.relative_to(ROOT)} ({total} shifts in all)")
     print(f"new to the workbook: {', '.join(added) or 'nobody'}")
-
-
-README = [
-    ("HOW TO EDIT THIS WORKBOOK", True),
-    ("", False),
-    ("One row per shift. If someone holds three office hours a week, they get three rows", False),
-    ("on the shifts sheet. Never put two names in one cell.", False),
-    ("", False),
-    ("The workbook covers two things: ENGR office hours, and tutoring in AV C141.", False),
-    ("A person can do both - they are listed once and get a row per shift either way.", False),
-    ("", False),
-    ("people sheet - everyone who holds hours, listed once", True),
-    ("  name          the exact name used on the shifts sheet. Must be unique.", False),
-    ("  display_name  what students see, if different (e.g. Dr. Torres). Blank = same as name.", False),
-    ("  role          faculty, gtf, or la. Pick from the dropdown.", False),
-    ("                Everyone who tutors is an la, whether or not they also hold", False),
-    ("                ENGR office hours.", False),
-    ("  courses       what they help with at ENGR OFFICE HOURS.", False),
-    ("                Leave BLANK for the default (ENGR 111 and ENGR 114).", False),
-    ("                If you fill it in, list ALL courses they cover, separated by ;", False),
-    ("                Anyone covering ENGR 111 is counted for ENGR 123 too - see the", False),
-    ("                course_implies row on the settings sheet.", False),
-    ("  courses_tutoring   what they can help with AT TUTORING. Separated by ;", False),
-    ("                Blank means they do not tutor. This is the only place to edit it -", False),
-    ("                every one of their tutoring shifts reads from this cell.", False),
-    ("  languages     languages BESIDES ENGLISH they can help in, separated by ;", False),
-    ("                Blank for most people. Becomes the Language filter and a", False),
-    ("                line in the panel. Rebuilt from the rota's bilingual list.", False),
-    ("  email, notes  optional. Both are shown to students, so keep notes short and useful.", False),
-    ("", False),
-    ("  Yellow cells were guessed during the migration - please check them.", False),
-    ("", False),
-    ("shifts sheet - one row per weekly hour", True),
-    ("  name          pick from the dropdown (it reads the people sheet)", False),
-    ("  day           Monday through Sunday. Days with no rows show as closed.", False),
-    ("  start / end   like 9:00 AM or 1:30 PM. Must land on the hour or half hour.", False),
-    ("  program       office hours or tutoring. Blank = office hours.", False),
-    ("                Tutoring rows take their room and their courses from tutoring:", False),
-    ("                leave location and courses blank unless this one row differs.", False),
-    ("  mode          in-person or online. Blank = in-person.", False),
-    ("  location      blank = the default room for the programme (see settings).", False),
-    ("                Fill it in for anywhere else - Scott Engineering, etc.", False),
-    ("                The site gives every room its own colour automatically.", False),
-    ("                For online, put the meeting link here.", False),
-    ("  courses       blank = whatever the people sheet says for that programme.", False),
-    ("  active        put no to hide a row for a while without deleting it.", False),
-    ("", False),
-    ("exceptions sheet - one-off changes to the normal week", True),
-    ("  Cancel one shift:  name, date, start, end, type = cancelled", False),
-    ("  Cancel a whole day for someone: leave start and end blank", False),
-    ("  Add extra hours:   name, date, start, end, type = added", False),
-    ("", False),
-    ("settings sheet - term dates, default rooms, and the announcement banner", True),
-    ("  default_location_tutoring   the tutoring room. One edit moves the whole", False),
-    ("                              programme.", False),
-    ("  subjects                    groups the courses in the Get help with menu.", False),
-    ("  course_order                the order that menu lists them in.", False),
-    ("", False),
-    ("When you are done: save, then send the file to Ben (or save it back to OneDrive).", False),
-]
-
-
-def rewrite_readme(ws):
-    for row in range(ws.max_row, 0, -1):
-        for col in range(1, ws.max_column + 1):
-            ws.cell(row, col).value = None
-    ws.column_dimensions["A"].width = 110
-    for r, (text, bold) in enumerate(README, start=1):
-        cell = ws.cell(row=r, column=1, value=text)
-        if bold:
-            cell.font = Font(bold=True)
 
 
 if __name__ == "__main__":

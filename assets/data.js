@@ -22,13 +22,12 @@ const DEFAULTS = {
   day_end: "9:00 PM",
   default_courses: "ENGR 111; ENGR 114",
   course_implies: "",
-  default_program: "office hours",
-  program_order: "",
   course_order: "",
   subjects: "",
-  default_location_faculty: "AV C147",
-  default_location_gtf: "AV C147",
-  default_location_la: "AV C144",
+  // Only reached when a location cell is left blank; every row on the shifts
+  // sheet is expected to name its own room.
+  default_location: "AV C144",
+  tutoring_room: "",
   term_name: "",
   announcement: "",
 };
@@ -195,9 +194,15 @@ function normalizeDay(value) {
   return hits.length === 1 ? hits[0] : null;
 }
 
-/** A programme name as a settings key: "office hours" -> "office_hours". */
-export const programKey = (v) =>
-  str(v).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+/**
+ * A location is a link, not a room, when it starts like one. That is the whole
+ * of what `mode` used to say, and it cannot get out of step with the location
+ * the way a separate column could.
+ */
+const isLink = (location) => /^(https?:)?\/\//i.test(str(location));
+
+/** Room names compared the way a person would: case and spacing don't count. */
+const roomKey = (v) => str(v).toLowerCase().replace(/\s+/g, " ");
 
 /**
  * The subject a course belongs to: the letters before its number, or the whole
@@ -243,12 +248,12 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   const courseRules = parseMappingRules(settings.course_implies);
   const expand = (courses) => expandCourses(courses, courseRules);
   const defaultCourses = expand(parseCourses(settings.default_courses));
-  const defaultProgram = str(settings.default_program) || DEFAULTS.default_program;
-  // A programme's room beats the role's: at tutoring everyone sits in the same
-  // room, whether or not they hold ENGR office hours the rest of the week.
-  const defaultLocation = (program, role) =>
-    str(settings[`default_location_${programKey(program)}`]) ||
-    str(settings[`default_location_${role}`]);
+  const defaultLocation = str(settings.default_location) || DEFAULTS.default_location;
+  // The one room that runs on the people sheet's course lists. Everywhere else
+  // is ENGR office hours and advertises `default_courses`, so where an hour is
+  // held is the only thing that decides what it offers — no second column to
+  // keep in step, and nothing a blank cell can quietly imply.
+  const tutoringRoom = roomKey(settings.tutoring_room);
 
   if (!peopleRows.length) {
     problem("error", "people", null,
@@ -273,31 +278,23 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
         `"${name}" has role "${str(r.role) || "(blank)"}". Use faculty, gtf, or la. This person and their shifts are hidden.`);
       continue;
     }
-    const courses = expand(parseCourses(r.courses));
     // Someone can be an ENGR Learning Assistant on Tuesday and tutor CHEM on
-    // Wednesday, so what they help with depends on which programme the shift
-    // belongs to, not on who they are. Any `courses_<programme>` column on the
-    // people sheet is picked up — adding a programme needs no code change.
-    const programCourses = {};
-    for (const [column, value] of Object.entries(r)) {
-      const match = /^courses_(.+)$/.exec(column);
-      if (!match || !str(value)) continue;
-      programCourses[programKey(match[1])] = expand(parseCourses(value));
-    }
+    // Wednesday. This column is the second of those: what they can help with in
+    // the tutoring room. Their ENGR office hours advertise `default_courses`.
+    const courses = expand(parseCourses(r.courses));
     people.set(key, {
       key,
+      // `name` is both the key the shifts sheet joins on and what students read,
+      // so the sheet asks for it written the way they should read it. There was a
+      // second `display_name` column for the difference; in a term of use nobody
+      // ever filled it in.
       name,
-      displayName: str(r.display_name) || name,
       role,
-      courses: courses.length ? courses : defaultCourses,
-      usesDefaultCourses: !courses.length,
-      programCourses,
-      email: str(r.email),
+      courses,
       // A property of the person, not of the shift: someone who can explain a
       // derivative in Spanish can do it at office hours and at tutoring alike,
       // even though the rota only records it beside the tutoring roster.
       languages: parseLanguages(r.languages),
-      notes: str(r.notes),
       shifts: [],
     });
   }
@@ -307,7 +304,6 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   for (const r of shiftRows) {
     const rawName = str(r.name);
     if (!rawName) continue;
-    if (/^no$/i.test(str(r.active))) continue;
 
     const person = people.get(nameKey(rawName));
     if (!person) {
@@ -342,18 +338,15 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
         `${rawName} ${day} ${formatRange(start, end)} falls partly outside the ${formatTime(dayStart)}–${formatTime(dayEnd)} grid and is clipped.`);
     }
 
-    const mode = /^online$/i.test(str(r.mode)) ? "online" : "in-person";
-    if (str(r.mode) && !/^(online|in-person|in person|inperson)$/i.test(str(r.mode))) {
+    const location = str(r.location) || defaultLocation;
+    if (!str(r.location)) {
       problem("warning", "shifts", r.__row,
-        `${rawName} ${day}: mode "${str(r.mode)}" is not recognized, treated as in-person.`);
+        `${rawName} ${day}: no location, so this hour is advertised as ${defaultLocation}. Fill the location column in.`);
     }
-    const courses = expand(parseCourses(r.courses));
-    const program = str(r.program) || defaultProgram;
-    const key = programKey(program);
-    const programCourses = person.programCourses[key];
-    if (key !== programKey(defaultProgram) && !programCourses && !courses.length) {
+    const atTutoring = tutoringRoom && roomKey(location) === tutoringRoom;
+    if (atTutoring && !person.courses.length) {
       problem("warning", "shifts", r.__row,
-        `${rawName} ${day}: this is a ${program} shift but their courses_${key} cell on the people sheet is blank, so it advertises their office-hours courses.`);
+        `${rawName} ${day}: this shift is in ${location}, but their courses cell on the people sheet is blank, so it advertises ${defaultCourses.join(", ")}.`);
     }
 
     shifts.push({
@@ -363,12 +356,9 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       dayIndex: DAYS.indexOf(day),
       start: round(Math.max(start, dayStart)),
       end: round(Math.min(end, dayEnd)),
-      mode,
-      program,
-      programKey: key,
-      location: str(r.location) || defaultLocation(program, person.role),
-      courses: courses.length ? courses : programCourses || person.courses,
-      notes: str(r.notes),
+      mode: isLink(location) ? "online" : "in-person",
+      location,
+      courses: atTutoring && person.courses.length ? person.courses : defaultCourses,
       row: r.__row,
     });
   }
@@ -437,9 +427,9 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
       person, date, type, dayIndex,
       start: start === null ? null : round(start),
       end: end === null ? null : round(end),
-      mode: /^online$/i.test(str(r.mode)) ? "online" : "in-person",
-      location: str(r.location) || defaultLocation(defaultProgram, person.role),
-      note: str(r.note) || str(r.notes),
+      mode: isLink(r.location) ? "online" : "in-person",
+      location: str(r.location) || defaultLocation,
+      note: str(r.note),
       row: r.__row,
     });
   }
@@ -455,11 +445,6 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
   // one that matches nothing is worse than not offering it. No `language_order`
   // setting: unlike courses and rooms, no language here outranks another.
   const languages = [...new Set(shifts.flatMap((s) => s.person.languages))].sort();
-  const programs = order(
-    [...new Set(shifts.map((s) => s.program))],
-    str(settings.program_order).split(";").map((v) => v.trim()).filter(Boolean),
-    programKey
-  );
   // Which days the week is open at all — read from every shift, not the filtered
   // ones, so choosing a course cannot make Friday collapse into a closed column.
   const openDays = new Set(shifts.map((s) => s.dayIndex));
@@ -471,17 +456,21 @@ export function buildModel({ people: peopleRows, shifts: shiftRows, exceptions: 
 
   return {
     settings, dayStart, dayEnd, people, shifts, exceptions, courses, roles, problems, courseRules,
-    programs, defaultProgram, openDays, subjectNames, languages,
+    openDays, subjectNames, languages, defaultCourses, tutoringRoom,
     slotCount: Math.ceil((dayEnd - dayStart) / SLOT_MINUTES),
   };
 }
 
 const round = (m) => Math.round(m / SLOT_MINUTES) * SLOT_MINUTES;
 
+/** Whether a location is the room whose hours run on the people sheet's courses. */
+export const atTutoringRoom = (model, location) =>
+  Boolean(model.tutoringRoom) && roomKey(location) === model.tutoringRoom;
+
 /**
  * `values` sorted by a preferred list from the settings sheet, with anything the
  * list does not name falling in alphabetically behind it. Same reasoning as
- * `room_order`: a course or programme dropping out must not reshuffle the rest.
+ * `room_order`: a course or a room dropping out must not reshuffle the rest.
  */
 function order(values, preferred, key = (v) => v) {
   const rank = new Map(preferred.map((v, i) => [key(v), i]));
@@ -525,7 +514,10 @@ export function availabilityAt(model, isoDate, dayIndex, minute, matches) {
     const pseudo = {
       id: `x${e.row}`, person: e.person, day: DAYS[e.dayIndex], dayIndex: e.dayIndex,
       start: e.start, end: e.end, mode: e.mode, location: e.location,
-      courses: e.person.courses, notes: e.note, oneOff: true,
+      courses: atTutoringRoom(model, e.location) && e.person.courses.length
+        ? e.person.courses
+        : model.defaultCourses,
+      notes: e.note, oneOff: true,
     };
     if (matches && !matches(pseudo)) continue;
     if (seen.has(e.person.key)) continue;

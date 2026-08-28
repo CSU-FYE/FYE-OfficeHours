@@ -6,12 +6,15 @@ from the Fall 2026 source schedules. It is kept so the conversion is auditable a
 re-runnable if the originals are corrected.
 
     python3 tools/make_workbook.py
-    python3 tools/add_tutoring.py     # ALWAYS, straight after
+    python3 tools/simplify_workbook.py   # ALWAYS, in this order
+    python3 tools/add_tutoring.py
 
-This script writes data/office-hours.xlsx from scratch, and it predates the AV C141
-tutoring programme: on its own it produces a workbook with no program column, no
-courses_tutoring column, and none of the tutoring rows. add_tutoring.py puts all of
-that back. Running this one alone silently drops half the schedule.
+This script writes data/office-hours.xlsx from scratch, and it predates both the AV
+C141 tutoring programme and the 2026 column cleanup. On its own it produces a
+workbook in the old wide shape - display_name, email, notes, mode, active - with no
+tutoring rows in it. simplify_workbook.py cuts it back to the columns in use and
+add_tutoring.py puts the tutoring half of the schedule back. Running this one alone
+silently drops half the schedule.
 
 Writes data/office-hours.xlsx and MIGRATION-NOTES.md.
 """
